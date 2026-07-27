@@ -126,7 +126,8 @@
         if (!matchesCE(getCF(en, mapping.ceField), mapping.ceValues)) return;
         // Date du CE : champ "Date CE" stampé par l'automatisation (exact), sinon création.
         const stampedTs = mapping.ceDateField ? parseTs(getCF(en, mapping.ceDateField)) : null;
-        const ts = stampedTs || parseTs(en.add_time) || parseTs(en.update_time);
+        // Date CE stampée en priorité ; à défaut, date de création. Plus d'update_time.
+        const ts = stampedTs || parseTs(en.add_time);
         if (!ts) return;
         const pid = personIdOf(en);
         const tt = normTitle(en.title);
@@ -176,5 +177,53 @@
     };
   }
 
-  window.PDStats = { computeStats };
+  // Liste détaillée des CE comptés pour la période courante (jour/semaine/mois),
+  // avec le nom, la date, la source (prospect/affaire) et si la date est stampée.
+  function ceDetail(data, mapping, opts) {
+    const leads = data.leads || [], deals = data.deals || [];
+    const nowMs = opts.nowMs, gran = opts.period || 'month';
+    const ownerId = opts.ownerId ? Number(opts.ownerId) : null;
+    if (!(mapping.ceField && mapping.ceValues && mapping.ceValues.length)) return [];
+    const pipeFilter = (mapping.pipelines && mapping.pipelines.length) ? new Set(mapping.pipelines.map(Number)) : null;
+    const inScope = (d) => !pipeFilter || pipeFilter.has(Number(d.pipeline_id));
+    const ownedBy = (e) => !ownerId || ownerOf(e) === ownerId;
+    const dScoped = deals.filter((d) => d.status !== 'deleted' && inScope(d) && ownedBy(d));
+    const cands = [];
+    const collect = (en, src) => {
+      if (!ownedBy(en)) return;
+      if (!matchesCE(getCF(en, mapping.ceField), mapping.ceValues)) return;
+      const stampedTs = mapping.ceDateField ? parseTs(getCF(en, mapping.ceDateField)) : null;
+      const ts = stampedTs || parseTs(en.add_time);
+      if (!ts) return;
+      const pid = personIdOf(en);
+      const tt = normTitle(en.title);
+      cands.push({ t: ts.getTime(), stamped: !!stampedTs, pk: pid ? 'p:' + pid : null, tk: tt ? 't:' + tt : null, title: en.title || '(sans nom)', src });
+    };
+    leads.forEach((l) => collect(l, 'lead'));
+    dScoped.forEach((d) => collect(d, 'deal'));
+    const parent = cands.map((_, i) => i);
+    const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    const union = (a, b) => { parent[find(a)] = find(b); };
+    const keyToNode = new Map();
+    cands.forEach((c, i) => { for (const k of [c.pk, c.tk]) { if (!k) continue; if (keyToNode.has(k)) union(i, keyToNode.get(k)); else keyToNode.set(k, i); } });
+    const groups = new Map();
+    cands.forEach((c, i) => {
+      const r = find(i);
+      let g = groups.get(r);
+      if (!g) { g = { anyMin: c.t, stampedMin: c.stamped ? c.t : undefined, title: c.title, inLead: false, inDeal: false }; groups.set(r, g); }
+      else { if (c.t < g.anyMin) g.anyMin = c.t; if (c.stamped && (g.stampedMin === undefined || c.t < g.stampedMin)) g.stampedMin = c.t; }
+      if (c.src === 'lead') g.inLead = true;
+      if (c.src === 'deal') g.inDeal = true;
+    });
+    const wantKey = keyOf(new Date(nowMs), gran);
+    const out = [];
+    for (const g of groups.values()) {
+      const t = g.stampedMin !== undefined ? g.stampedMin : g.anyMin;
+      if (keyOf(new Date(t), gran) === wantKey) out.push({ date: t, stamped: g.stampedMin !== undefined, title: g.title, inLead: g.inLead, inDeal: g.inDeal });
+    }
+    out.sort((a, b) => b.date - a.date);
+    return out;
+  }
+
+  window.PDStats = { computeStats, ceDetail };
 })();

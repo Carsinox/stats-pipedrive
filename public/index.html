@@ -70,6 +70,23 @@
   .status{text-align:center;padding:56px 20px;color:var(--text-secondary)}
   .err{color:var(--critical)}
   .footnote{font-size:12px;color:var(--muted);margin-top:22px;text-align:center;line-height:1.6}
+  .tile.clickable{cursor:pointer;position:relative}
+  .tile.clickable:hover{border-color:var(--baseline)}
+  .tile .look{position:absolute;top:12px;right:14px;font-size:12px;color:var(--muted)}
+  .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;z-index:30;padding:40px 16px;overflow:auto}
+  .modal-ov.on{display:flex}
+  .modal{background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;max-width:600px;width:100%;box-shadow:var(--shadow);padding:18px 20px}
+  .modal h3{margin:0 0 2px;font-size:16px}
+  .modal .msub{color:var(--text-secondary);font-size:13px;margin:0 0 12px}
+  .modal table{width:100%;border-collapse:collapse;font-size:13.5px}
+  .modal td{padding:7px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .modal td.dt{color:var(--text-secondary);white-space:nowrap;width:1%}
+  .modal .tag{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap}
+  .modal .tag.lead{color:var(--s-ce);border-color:var(--s-ce)}
+  .modal .tag.deal{color:var(--s-r2);border-color:var(--s-r2)}
+  .modal .tag.appr{color:var(--warn);border-color:var(--warn)}
+  .modal .close{float:right;cursor:pointer;border:0;background:transparent;font-size:22px;color:var(--muted);line-height:1}
+  .modal .empty{color:var(--muted);font-size:13px;padding:14px 0}
   .tt{position:fixed;pointer-events:none;z-index:20;background:var(--text-primary);color:var(--surface);
     font-size:12px;padding:7px 10px;border-radius:8px;opacity:0;transition:opacity .1s;box-shadow:var(--shadow);white-space:nowrap}
   .tt b{font-weight:650}
@@ -142,9 +159,19 @@
 </div>
 <div class="tt" id="tooltip"></div>
 
+<div class="modal-ov" id="ceModal">
+  <div class="modal">
+    <button class="close" id="ceClose" title="Fermer">×</button>
+    <h3>Détail des CE</h3>
+    <p class="msub" id="ceSub"></p>
+    <div id="ceBody"></div>
+  </div>
+</div>
+
 <script src="stats-client.js"></script>
 <script>
 const $ = (s)=>document.querySelector(s);
+const escapeHtml=(s)=>String(s==null?'':s).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const state = { pipeline:'all', user:'all', gran:'month', raw:null, data:null };
 const tooltip = $('#tooltip');
 
@@ -236,6 +263,7 @@ function barChart(el,labels,a,b,colA,colB){
 function render(d){
   const k=d.kpis;
   actTile($('#tileCE'),'CE — Contacts établis','var(--s-ce)',k.ce);
+  const ceTile=$('#tileCE'); ceTile.classList.add('clickable'); ceTile.insertAdjacentHTML('beforeend','<span class="look">détail ›</span>');
   actTile($('#tileR2'),'R2 — Affaires créées','var(--s-r2)',k.r2);
   actTile($('#tileMandat'),'Mandats rentrés','var(--s-mandat)',k.mandats);
   singleTile($('#tileTaux'),'Taux de transformation (mois)',pct(k.tauxTransfo),
@@ -260,6 +288,7 @@ function recompute(){
   const raw=state.raw; if(!raw) return;
   const mapping={...raw.mapping};
   if(state.pipeline!=='all') mapping.pipelines=[Number(state.pipeline)];
+  state.mapping=mapping;
   const nowMs=Date.parse(raw.generatedAt)||Date.now();
   const ownerId=state.user==='all'?null:Number(state.user);
   const stats=window.PDStats.computeStats(raw, mapping, {nowMs, gran:state.gran, ownerId});
@@ -300,6 +329,31 @@ async function load(){
 
 function applyTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('pd_theme',t);}catch(_){}}
 (function(){const s=localStorage.getItem('pd_theme');if(s)document.documentElement.setAttribute('data-theme',s);})();
+
+// ---------- vue détail CE ----------
+function periodLabel(g){return g==='day'?"aujourd'hui":g==='week'?'cette semaine':'ce mois-ci';}
+function openCE(){
+  if(!state.raw||!state.mapping)return;
+  const nowMs=Date.parse(state.raw.generatedAt)||Date.now();
+  const ownerId=state.user==='all'?null:Number(state.user);
+  const list=window.PDStats.ceDetail(state.raw,state.mapping,{nowMs,ownerId,period:state.gran});
+  const uname=state.user==='all'?'tous les commerciaux':(($('#userSel').selectedOptions[0]||{}).textContent||'');
+  $('#ceSub').textContent=`${list.length} CE · ${periodLabel(state.gran)} · ${uname}`;
+  const body=$('#ceBody');
+  if(!list.length){body.innerHTML='<div class="empty">Aucun CE sur cette période avec les filtres actuels.</div>';}
+  else{
+    body.innerHTML='<table>'+list.map(x=>{
+      const d=new Date(x.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+      const src=x.inLead&&x.inDeal?'<span class="tag lead">prospect</span> <span class="tag deal">affaire</span>':x.inLead?'<span class="tag lead">prospect</span>':'<span class="tag deal">affaire</span>';
+      const appr=x.stamped?'':' <span class="tag appr" title="Daté à la création (Date CE non renseignée)">approx.</span>';
+      return `<tr><td class="dt">${d}</td><td>${escapeHtml(x.title)}</td><td style="text-align:right">${src}${appr}</td></tr>`;
+    }).join('')+'</table>';
+  }
+  $('#ceModal').classList.add('on');
+}
+$('#tileCE').addEventListener('click',openCE);
+$('#ceClose').onclick=()=>$('#ceModal').classList.remove('on');
+$('#ceModal').addEventListener('click',(e)=>{if(e.target.id==='ceModal')$('#ceModal').classList.remove('on');});
 
 $('#pipelineSel').onchange=(e)=>{state.pipeline=e.target.value;recompute();};
 $('#userSel').onchange=(e)=>{state.user=e.target.value;recompute();};

@@ -159,7 +159,9 @@ function computeStats({ deals = [], activities = [], persons = [], leads = [], p
       // Date du CE : le champ "Date CE" stampé par l'automatisation (exact, gère les
       // prospects importés marqués plus tard) ; à défaut, repli sur la création.
       const stampedTs = mapping.ceDateField ? parseTs(getCF(en, mapping.ceDateField)) : null;
-      const ts = stampedTs || parseTs(en.add_time) || parseTs(en.update_time);
+      // Date CE stampée en priorité ; à défaut, date de création (historique).
+      // update_time n'est plus utilisé (il bougeait à chaque édition).
+      const ts = stampedTs || parseTs(en.add_time);
       if (!ts) return;
       const pid = personIdOf(en);
       const tt = normTitle(en.title);

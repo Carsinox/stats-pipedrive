@@ -39,11 +39,11 @@ check('séries jour/semaine/mois', () => {
 
 // ---------- CE : union LEADS + AFFAIRES, daté update_time, dédupliqué ----------
 const leads = [
-  { person_id: 1, title: 'Jean Dupont', owner_id: 101, update_time: iso(2026, 7, 3), custom_fields: { cr: 21 } },
-  { person_id: 2, title: 'Marie Curie', owner_id: 101, update_time: iso(2026, 7, 9), custom_fields: { cr: 21 } },
-  { person_id: 3, title: 'Paul Martin', owner_id: 102, update_time: iso(2026, 7, 14), custom_fields: { cr: 21 } },
-  { person_id: 4, title: 'Autre', owner_id: 102, update_time: iso(2026, 7, 10), custom_fields: { cr: 22 } }, // pas CE
-  { person_id: 5, title: 'Ancien', owner_id: 101, update_time: iso(2026, 6, 20), custom_fields: { cr: 21 } }, // mois précédent
+  { person_id: 1, title: 'Jean Dupont', owner_id: 101, add_time: iso(2026, 7, 3), custom_fields: { cr: 21 } },
+  { person_id: 2, title: 'Marie Curie', owner_id: 101, add_time: iso(2026, 7, 9), custom_fields: { cr: 21 } },
+  { person_id: 3, title: 'Paul Martin', owner_id: 102, add_time: iso(2026, 7, 14), custom_fields: { cr: 21 } },
+  { person_id: 4, title: 'Autre', owner_id: 102, add_time: iso(2026, 7, 10), custom_fields: { cr: 22 } }, // pas CE
+  { person_id: 5, title: 'Ancien', owner_id: 101, add_time: iso(2026, 6, 20), custom_fields: { cr: 21 } }, // mois précédent
 ];
 const dealsCE = [
   // doublon de Jean Dupont via la même PERSONNE (person_id 1)
