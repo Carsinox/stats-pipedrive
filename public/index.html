@@ -49,9 +49,7 @@
     color:#fff;box-shadow:0 2px 14px rgba(42,59,78,.22)}
   .appbar-inner{max-width:1180px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:14px}
   .brand{display:flex;align-items:center;gap:12px;min-width:0}
-  .logo{width:42px;height:42px;border-radius:12px;flex:none;display:grid;place-items:center;font-weight:800;
-    letter-spacing:.5px;font-size:15px;color:var(--brand-ink);
-    background:linear-gradient(160deg,#fff,#DCE5EF);box-shadow:0 2px 8px rgba(0,0,0,.18)}
+  .logo-img{height:40px;width:auto;flex:none;display:block}
   .brand-title{font-size:16px;font-weight:700;letter-spacing:-.01em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sub{color:rgba(255,255,255,.72);font-size:12px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .appbar-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
@@ -154,7 +152,7 @@
   @media (max-width:560px){
     .wrap{padding:14px 13px 56px}
     .appbar-inner{padding:11px 13px;gap:10px}
-    .logo{width:38px;height:38px}
+    .logo-img{height:32px}
     .card{padding:15px;border-radius:14px}
     .controls{gap:8px}
     select{min-width:0;font-size:13.5px;padding:11px 30px 11px 12px}
@@ -171,7 +169,7 @@
 <header class="appbar">
   <div class="appbar-inner">
     <div class="brand">
-      <div class="logo">VPA</div>
+      <img class="logo-img" src="logo.png" alt="VPA — Votre Projet Auto" />
       <div style="min-width:0">
         <div class="brand-title">Statistiques commerciales</div>
         <div class="sub" id="subline">Chargement…</div>
