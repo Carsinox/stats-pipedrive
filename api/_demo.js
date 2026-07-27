@@ -1,8 +1,9 @@
 // Jeu de démonstration reproduisant la vraie structure :
-//  - prospects (contacts) avec un champ "résultat d'appel" (CE = "Contact établi")
-//  - affaires multi-pipelines (VPA Bordeaux / VPA La Réunion) avec un champ date "règlement mandat"
-//  - plusieurs commerciaux (users) pour tester le filtre
-// Utilisé tant que le mapping des vrais champs n'est pas configuré.
+//  - prospects (LEADS) avec un champ "résultat d'appel" (CE = "Contact établi")
+//  - affaires (DEALS) multi-pipelines, certaines issues d'un lead (même personne/titre),
+//    avec le même champ "résultat d'appel" + un champ date "règlement mandat"
+//  - plusieurs commerciaux (users)
+// Sert d'aperçu tant que le mapping des vrais champs n'est pas configuré.
 
 const DEMO_USERS = [
   { id: 101, name: 'Camille Robert' },
@@ -14,10 +15,8 @@ const DEMO_MAPPING = {
   mandatValue: 500,
   pipelines: [],
   mandatDateField: 'mandat_date',
-  ceSource: 'person',
   ceField: 'call_result',
   ceValues: ['21'],          // id d'option "Contact établi"
-  ceActivityTypes: [],
 };
 
 function seeded(seed) {
@@ -28,7 +27,7 @@ function seeded(seed) {
 function buildDemo(nowMs) {
   const rnd = seeded(7);
   const DAY = 86400000;
-  const iso = (ms) => new Date(ms).toISOString();
+  const iso = (ms) => new Date(Math.min(ms, nowMs)).toISOString();
   const isoDate = (ms) => new Date(ms).toISOString().slice(0, 10);
   const pickUser = () => DEMO_USERS[Math.floor(rnd() * DEMO_USERS.length)].id;
 
@@ -37,27 +36,33 @@ function buildDemo(nowMs) {
     { id: 7, name: 'VPA La Réunion' },
   ];
 
-  // ---- Prospects (contacts) sur ~13 mois ----
-  const persons = [];
-  let pid = 1;
+  // ---- Prospects (leads) sur ~13 mois ----
+  const leads = [];
+  let lid = 1;
   for (let d = 395; d >= 0; d--) {
     const dayMs = nowMs - d * DAY;
     const dow = new Date(dayMs).getUTCDay();
     if (dow === 0 || dow === 6) continue;
-    const created = 2 + Math.floor(rnd() * 5);
+    const created = 2 + Math.floor(rnd() * 4);
     for (let i = 0; i < created; i++) {
       const r = rnd();
-      const result = r < 0.45 ? 21 : r < 0.7 ? 22 : r < 0.9 ? 23 : 0; // 45% Contact établi
-      persons.push({
-        id: pid++,
-        add_time: iso(dayMs - Math.floor(rnd() * 6) * 3600000),
-        owner_id: pickUser(),
-        custom_fields: result ? { call_result: result } : {},
+      const result = r < 0.45 ? 21 : r < 0.7 ? 22 : 23;
+      const owner = pickUser();
+      leads.push({
+        id: lid,
+        person_id: 5000 + lid,
+        title: `Prospect ${lid}`,
+        owner_id: owner,
+        add_time: iso(dayMs),
+        update_time: iso(dayMs + Math.floor(rnd() * 3) * DAY),
+        custom_fields: { call_result: result },
       });
+      lid++;
     }
   }
+  const ceLeads = leads.filter((l) => l.custom_fields.call_result === 21);
 
-  // ---- Affaires sur 12 mois, réparties sur 2 pipelines ----
+  // ---- Affaires sur 12 mois ----
   const deals = [];
   let id = 1;
   for (let m = 11; m >= 0; m--) {
@@ -65,12 +70,27 @@ function buildDemo(nowMs) {
     const created = 16 + Math.floor(rnd() * 10);
     for (let i = 0; i < created; i++) {
       const addMs = monthBase + Math.floor(rnd() * 28) * DAY;
-      const pipeline_id = rnd() < 0.65 ? 1 : 7;
-      const value = Math.round((rnd() * 8000 + 4000) / 100) * 100;
+      let pipeline_id = rnd() < 0.65 ? 1 : 7;
+      let owner = pickUser();
+      let person_id = null, title = `Affaire ${id}`, call_result;
+
+      const link = rnd();
+      if (link < 0.4 && ceLeads.length) {
+        // Affaire issue d'un prospect CE existant -> même personne/titre + résultat copié (DOUBLON à dédupliquer)
+        const L = ceLeads[Math.floor(rnd() * ceLeads.length)];
+        person_id = L.person_id; title = L.title; owner = L.owner_id; call_result = 21;
+      } else if (link < 0.55) {
+        // CE directement dans l'affaire (sans lead)
+        person_id = 90000 + id; call_result = 21;
+      }
+
       const deal = {
-        id: id++, title: `Affaire ${id}`, value, currency: 'EUR',
-        pipeline_id, owner_id: pickUser(), add_time: iso(addMs), custom_fields: {},
+        id: id, title, person_id, pipeline_id, owner_id: owner, currency: 'EUR',
+        add_time: iso(addMs), update_time: iso(addMs + Math.floor(rnd() * 20) * DAY),
+        custom_fields: {},
       };
+      if (call_result) deal.custom_fields.call_result = call_result;
+
       const gotMandat = rnd() < 0.55;
       if (gotMandat) {
         const mandatMs = addMs + Math.floor(rnd() * 12 + 2) * DAY;
@@ -83,18 +103,17 @@ function buildDemo(nowMs) {
           const lostMs = mandatMs + Math.floor(rnd() * 30 + 10) * DAY;
           if (lostMs <= nowMs) { deal.status = 'lost'; deal.lost_time = iso(lostMs); } else deal.status = 'open';
         } else deal.status = 'open';
-      } else {
-        if (rnd() < 0.5) {
-          const lostMs = addMs + Math.floor(rnd() * 25 + 5) * DAY;
-          if (lostMs <= nowMs) { deal.status = 'lost'; deal.lost_time = iso(lostMs); } else deal.status = 'open';
-        } else deal.status = 'open';
+      } else if (rnd() < 0.5) {
+        const lostMs = addMs + Math.floor(rnd() * 25 + 5) * DAY;
+        if (lostMs <= nowMs) { deal.status = 'lost'; deal.lost_time = iso(lostMs); } else deal.status = 'open';
       }
       if (!deal.status) deal.status = 'open';
       deals.push(deal);
+      id++;
     }
   }
 
-  return { pipelines, persons, deals, activities: [], leads: [], users: DEMO_USERS, mapping: DEMO_MAPPING };
+  return { pipelines, leads, deals, users: DEMO_USERS, mapping: DEMO_MAPPING };
 }
 
 module.exports = { buildDemo, DEMO_MAPPING };

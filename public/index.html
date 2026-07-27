@@ -142,9 +142,10 @@
 </div>
 <div class="tt" id="tooltip"></div>
 
+<script src="stats-client.js"></script>
 <script>
 const $ = (s)=>document.querySelector(s);
-const state = { pipeline:'all', user:'all', gran:'month', data:null };
+const state = { pipeline:'all', user:'all', gran:'month', raw:null, data:null };
 const tooltip = $('#tooltip');
 
 const nf = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
@@ -254,13 +255,26 @@ function render(d){
   barChart($('#finChart'),d.finance.labels,d.finance.ca,d.finance.remboursements,cs.getPropertyValue('--good'),cs.getPropertyValue('--critical'));
 }
 
+// Recalcule et affiche à partir des données déjà chargées (instantané, sans réseau).
+function recompute(){
+  const raw=state.raw; if(!raw) return;
+  const mapping={...raw.mapping};
+  if(state.pipeline!=='all') mapping.pipelines=[Number(state.pipeline)];
+  const nowMs=Date.parse(raw.generatedAt)||Date.now();
+  const ownerId=state.user==='all'?null:Number(state.user);
+  const stats=window.PDStats.computeStats(raw, mapping, {nowMs, gran:state.gran, ownerId});
+  state.data={...stats, demo:raw.demo, generatedAt:raw.generatedAt};
+  render(state.data);
+}
+
+// Charge les données brutes UNE fois, puis remplit les menus.
 async function load(){
-  $('#status').style.display='block';$('#status').className='status';$('#status').textContent='Chargement…';$('#content').style.display='none';
+  $('#status').style.display='block';$('#status').className='status';$('#status').textContent='Chargement des données…';$('#content').style.display='none';
   try{
-    const res=await fetch(`/api/stats?gran=${state.gran}&pipeline=${encodeURIComponent(state.pipeline)}&user=${encodeURIComponent(state.user)}`);
+    const res=await fetch('/api/data');
     const d=await res.json();
     if(d.error) throw new Error(d.message||'Erreur inconnue');
-    state.data=d;
+    state.raw=d;
     const sel=$('#pipelineSel');
     if(sel.dataset.filled!=='1'&&d.pipelines&&d.pipelines.length){
       d.pipelines.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
@@ -277,9 +291,9 @@ async function load(){
     $('#foot').innerHTML=d.demo
       ? (d.reason==='no_token'
           ? "Mode démo : configurez PIPEDRIVE_DOMAIN et PIPEDRIVE_API_TOKEN pour vos données réelles."
-          : "Mode démo : le mapping des champs (CE, règlement mandat) n'est pas encore renseigné — voir README / <code>node scripts/discover.js</code>.")
+          : "Mode démo : le mapping des champs (CE, règlement mandat) n'est pas encore renseigné — voir la page ⚙ Configuration.")
       : '';
-    render(d);
+    recompute();
     $('#status').style.display='none';$('#content').style.display='block';
   }catch(e){$('#status').className='status err';$('#status').textContent='⚠ '+e.message;$('#content').style.display='none';}
 }
@@ -287,11 +301,11 @@ async function load(){
 function applyTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('pd_theme',t);}catch(_){}}
 (function(){const s=localStorage.getItem('pd_theme');if(s)document.documentElement.setAttribute('data-theme',s);})();
 
-$('#pipelineSel').onchange=(e)=>{state.pipeline=e.target.value;load();};
-$('#userSel').onchange=(e)=>{state.user=e.target.value;load();};
+$('#pipelineSel').onchange=(e)=>{state.pipeline=e.target.value;recompute();};
+$('#userSel').onchange=(e)=>{state.user=e.target.value;recompute();};
 $('#refreshBtn').onclick=load;
 $('#granSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
-  state.gran=b.dataset.g;$('#granSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));load();
+  state.gran=b.dataset.g;$('#granSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));recompute();
 });
 $('#themeBtn').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');
   const dark=c==='dark'||(c!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);

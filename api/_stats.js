@@ -97,6 +97,39 @@ function ownerOf(entity) {
   if (typeof o === 'object') return Number(o.id != null ? o.id : o.value);
   return Number(o);
 }
+// Id de la personne liée (pour dédupliquer lead <-> affaire du même prospect).
+function personIdOf(e) {
+  const p = e && e.person_id;
+  if (p == null) return null;
+  if (typeof p === 'object') return Number(p.value != null ? p.value : p.id);
+  const n = Number(p);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+function normTitle(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+// Regroupe des candidats CE qui partagent la même personne OU le même titre
+// (union-find), et renvoie le timestamp le plus ancien de chaque groupe.
+function ceGroupTimes(cands) {
+  const parent = cands.map((_, i) => i);
+  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const union = (a, b) => { parent[find(a)] = find(b); };
+  const keyToNode = new Map();
+  cands.forEach((c, i) => {
+    for (const k of [c.pk, c.tk]) {
+      if (!k) continue;
+      if (keyToNode.has(k)) union(i, keyToNode.get(k));
+      else keyToNode.set(k, i);
+    }
+  });
+  const groupMin = new Map();
+  cands.forEach((c, i) => {
+    const r = find(i);
+    const cur = groupMin.get(r);
+    if (cur === undefined || c.t < cur) groupMin.set(r, c.t);
+  });
+  return [...groupMin.values()];
+}
 
 function computeStats({ deals = [], activities = [], persons = [], leads = [], pipelines = [] }, mapping, opts) {
   const nowMs = opts.nowMs;
@@ -111,37 +144,24 @@ function computeStats({ deals = [], activities = [], persons = [], leads = [], p
   const dScoped = deals.filter((d) => d.status !== 'deleted' && inScope(d) && ownedBy(d));
 
   // ----- Événements CE -----
-  // Le champ "résultat d'appel = Contact établi" peut vivre sur l'activité (défaut),
-  // sur l'affaire ou sur le contact, selon la configuration Pipedrive.
+  // CE = champ "résultat d'appel = Contact établi", sur le PROSPECT (lead) OU sur l'AFFAIRE.
+  // Daté à la dernière mise à jour de la fiche. Déduplication lead <-> affaire (même
+  // personne, ou même titre) : un prospect présent aux deux endroits = 1 seul CE.
   const ceEvents = [];
   if (mapping.ceField && mapping.ceValues && mapping.ceValues.length) {
-    const src = mapping.ceSource || 'activity';
-    if (src === 'activity') {
-      for (const a of activities) {
-        if (a.done === false) continue;
-        if (mapping.ceActivityTypes && mapping.ceActivityTypes.length) {
-          if (!mapping.ceActivityTypes.map(String).includes(String(a.type))) continue;
-        }
-        if (!matchesCE(getCF(a, mapping.ceField), mapping.ceValues)) continue;
-        const ts = parseTs(a.marked_as_done_time)
-          || parseTs(a.due_date ? `${a.due_date}${a.due_time ? 'T' + a.due_time + ':00Z' : ''}` : null)
-          || parseTs(a.update_time) || parseTs(a.add_time);
-        if (ts) ceEvents.push(ts);
-      }
-    } else {
-      // Source 'person' (contact/prospect), 'lead' ou 'deal' : on compte les entités
-      // marquées "Contact établi", datées par leur création (meilleure date disponible
-      // sans historique de champ), filtrées par owner sélectionné.
-      const entities = src === 'person' ? persons : src === 'lead' ? leads : dScoped;
-      for (const en of entities) {
-        if (!ownedBy(en)) continue;
-        if (!matchesCE(getCF(en, mapping.ceField), mapping.ceValues)) continue;
-        // Daté à la DERNIÈRE MISE À JOUR de la fiche (au plus proche du moment où
-        // le prospect a été nommé "Contact établi"), avec repli sur la création.
-        const ts = parseTs(en.update_time) || parseTs(en.add_time);
-        if (ts) ceEvents.push(ts);
-      }
-    }
+    const cands = [];
+    const collect = (en) => {
+      if (!ownedBy(en)) return;
+      if (!matchesCE(getCF(en, mapping.ceField), mapping.ceValues)) return;
+      const ts = parseTs(en.update_time) || parseTs(en.add_time);
+      if (!ts) return;
+      const pid = personIdOf(en);
+      const tt = normTitle(en.title);
+      cands.push({ t: ts.getTime(), pk: pid ? 'p:' + pid : null, tk: tt ? 't:' + tt : null });
+    };
+    for (const l of leads) collect(l);       // prospects (leads)
+    for (const d of dScoped) collect(d);      // affaires (scope pipeline + owner)
+    ceGroupTimes(cands).forEach((t) => ceEvents.push(new Date(t)));
   }
 
   // ----- Événements R2 (affaires créées) -----

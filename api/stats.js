@@ -40,21 +40,14 @@ module.exports = async (req, res) => {
     return;
   }
 
-  // ---- Mode réel ----
+  // ---- Mode réel ----  (endpoint historique ; le dashboard utilise désormais /api/data)
   try {
-    const source = mapping.ceSource || 'person';
     const hasCE = !!mapping.ceField && mapping.ceValues.length;
-    const needActivities = hasCE && source === 'activity';
-    const needPersons = hasCE && source === 'person';
-    const needLeads = hasCE && source === 'lead';
-
-    const [pipelines, usersRaw, deals, activities, persons, leads] = await Promise.all([
+    const [pipelines, usersRaw, deals, leads] = await Promise.all([
       pdGetAll('/pipelines'),
       pdGet('/users', {}, 'v1').then((r) => r.data || []).catch(() => []),
       pdGetAll('/deals'),
-      needActivities ? pdGetAll('/activities', { done: true }) : Promise.resolve([]),
-      needPersons ? pdGetAll('/persons') : Promise.resolve([]),
-      needLeads ? pdGetAllV1('/leads') : Promise.resolve([]),
+      hasCE ? pdGetAllV1('/leads') : Promise.resolve([]),
     ]);
 
     const users = (usersRaw || [])
@@ -62,7 +55,7 @@ module.exports = async (req, res) => {
       .map((u) => ({ id: u.id, name: u.name }))
       .sort((a, b) => String(a.name).localeCompare(String(b.name), 'fr'));
 
-    const stats = computeStats({ pipelines, deals, activities, persons, leads }, mapping, { nowMs, gran, ownerId });
+    const stats = computeStats({ pipelines, deals, leads }, mapping, { nowMs, gran, ownerId });
     res.statusCode = 200;
     res.end(JSON.stringify({ demo: false, generatedAt: new Date(nowMs).toISOString(), users, ...stats }));
   } catch (err) {

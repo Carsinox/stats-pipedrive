@@ -98,8 +98,8 @@ module.exports = async (req, res) => {
     }
 
     const suggest =
-`PIPEDRIVE_MANDAT_DATE_FIELD=${guessMandat ? guessMandat.key : 'REMPLACER'}
-PIPEDRIVE_CE_SOURCE=${ceSource || 'REMPLACER (deal, person ou activity)'}
+`PIPEDRIVE_PIPELINES=1,7
+PIPEDRIVE_MANDAT_DATE_FIELD=${guessMandat ? guessMandat.key : 'REMPLACER'}
 PIPEDRIVE_CE_FIELD=${ce ? ce.field.key : 'REMPLACER'}
 PIPEDRIVE_CE_VALUES=${ce && ce.option ? ce.option.id : 'REMPLACER'}
 PIPEDRIVE_MANDAT_VALUE=500`;
@@ -114,7 +114,7 @@ PIPEDRIVE_MANDAT_VALUE=500`;
       <div class="card">
         <h2 style="margin-top:0">${detected ? '<span class="ok">✓ Détection automatique réussie</span>' : '<span class="warn">⚠ Détection partielle — repérez à la main les valeurs "REMPLACER" dans les tableaux plus bas</span>'}</h2>
         <pre>${esc(suggest)}</pre>
-        ${ceSource ? `<p class="muted">Champ « Contact établi » trouvé sur : <b>${ceSource === 'deal' ? "l'affaire" : ceSource === 'person' ? 'le contact' : "l'activité"}</b>.</p>` : ''}
+        ${ce ? `<p class="muted">Champ « résultat d'appel » détecté. Le CE est compté automatiquement sur les <b>leads (prospects) ET les affaires</b>, avec déduplication.</p>` : ''}
         <a class="btn" href="/">← Retour au dashboard</a>
       </div>
 
@@ -130,8 +130,8 @@ PIPEDRIVE_MANDAT_VALUE=500`;
           (f) => esc(f.name)])}
       </table></div>
 
-      <h2>Champs à choix des AFFAIRES / LEADS (prospects) <span class="pill">→ résultat d'appel ?</span></h2>
-      <p class="muted" style="margin:-6px 0 6px">Dans Pipedrive, les leads partagent ces champs avec les affaires. Si ton « résultat d'appel » est ici, mets <code>PIPEDRIVE_CE_SOURCE=lead</code>.</p>
+      <h2>Champs à choix des AFFAIRES / LEADS (prospects) <span class="pill">→ résultat d'appel</span></h2>
+      <p class="muted" style="margin:-6px 0 6px">Dans Pipedrive, les leads partagent ces champs avec les affaires. Repère ici « résultat d'appel » et l'option « Contact établi ».</p>
       <div class="card">${choiceTable(dealFields, ce && (ceSource === 'deal') ? ce.field.key : null, ce && ce.option && ceSource === 'deal' ? ce.option.id : null)}</div>
 
       <h2>Champs à choix des CONTACTS <span class="pill">→ résultat d'appel ?</span></h2>
