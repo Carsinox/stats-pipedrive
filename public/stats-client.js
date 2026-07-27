@@ -226,5 +226,32 @@
     return out;
   }
 
-  window.PDStats = { computeStats, ceDetail };
+  // Détail générique par indicateur, pour la période courante (jour/semaine/mois/all).
+  function detail(kind, data, mapping, opts) {
+    if (kind === 'ce') return ceDetail(data, mapping, opts);
+    const deals = data.deals || [];
+    const nowMs = opts.nowMs, gran = opts.period || 'month';
+    const ownerId = opts.ownerId ? Number(opts.ownerId) : null;
+    const pipeFilter = (mapping.pipelines && mapping.pipelines.length) ? new Set(mapping.pipelines.map(Number)) : null;
+    const inScope = (d) => !pipeFilter || pipeFilter.has(Number(d.pipeline_id));
+    const ownedBy = (e) => !ownerId || ownerOf(e) === ownerId;
+    const dScoped = deals.filter((d) => d.status !== 'deleted' && inScope(d) && ownedBy(d));
+    const curKey = gran === 'all' ? null : keyOf(new Date(nowMs), gran);
+    const inBucket = (ms) => ms != null && (gran === 'all' || keyOf(new Date(ms), gran) === curKey);
+    const curMonth = monthKey(new Date(nowMs));
+    const inMonth = (ms) => ms != null && monthKey(new Date(ms)) === curMonth;
+    const rows = [];
+    for (const d of dScoped) {
+      const title = d.title || '(sans nom)';
+      if (kind === 'r2') { const t = parseTs(d.add_time); if (t && inBucket(t.getTime())) rows.push({ date: t.getTime(), title }); }
+      else if (kind === 'mandat') { const t = parseTs(getCF(d, mapping.mandatDateField)); if (t && inBucket(t.getTime())) rows.push({ date: t.getTime(), title }); }
+      else if (kind === 'ca') { if (d.status !== 'won') continue; const t = parseTs(d.won_time); if (t && inMonth(t.getTime())) rows.push({ date: t.getTime(), title }); }
+      else if (kind === 'potentiel') { if (d.status !== 'open') continue; const t = parseTs(getCF(d, mapping.mandatDateField)); if (t) rows.push({ date: t.getTime(), title }); }
+      else if (kind === 'remboursement') { if (d.status !== 'lost') continue; if (!parseTs(getCF(d, mapping.mandatDateField))) continue; const t = parseTs(d.lost_time); if (t && inMonth(t.getTime())) rows.push({ date: t.getTime(), title }); }
+    }
+    rows.sort((a, b) => b.date - a.date);
+    return rows;
+  }
+
+  window.PDStats = { computeStats, detail };
 })();

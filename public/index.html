@@ -98,6 +98,24 @@
   .tile .look{position:absolute;top:14px;right:16px;font-size:11.5px;font-weight:600;color:var(--brand-2);opacity:.85}
   .tile.clickable .label{padding-right:50px}
   .icon-btn svg{display:block}
+  .dot.dash{width:16px;height:0;border:0;border-top:2px dashed var(--critical);border-radius:0;background:none!important}
+
+  /* ---------- Objectif + batterie ---------- */
+  .objbar{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:16px}
+  .objbar .oi{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .objbar label{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-secondary)}
+  .objrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .objrow input{font:inherit;font-size:20px;font-weight:750;width:130px;padding:10px 13px;border-radius:12px;
+    border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-variant-numeric:tabular-nums}
+  .objrow input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 28%,transparent)}
+  .obj-hint{font-size:12.5px;color:var(--muted);max-width:260px;line-height:1.4}
+  .batt-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;flex:none}
+  .battery{display:flex;align-items:center;gap:3px;padding:5px 6px;border:2px solid var(--baseline);border-radius:9px;background:var(--surface)}
+  .battery .cell{width:9px;height:28px;border-radius:2px;background:var(--grid);transition:background .3s}
+  .battery::after{content:"";width:4px;height:13px;border-radius:0 3px 3px 0;background:var(--baseline);margin-left:1px}
+  .batt-cap{font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:800;color:var(--text-secondary)}
+  .batt-pct{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
+  @media (max-width:560px){ .objbar{justify-content:center;text-align:center} .objbar .oi{align-items:center} .objrow{justify-content:center} .obj-hint{max-width:none} }
 
   .card h2{font-size:15px;margin:0 0 2px;font-weight:700;letter-spacing:-.01em}
   .card .hint{font-size:12.5px;color:var(--muted);margin:0 0 12px}
@@ -192,6 +210,22 @@
   </div>
 
   <div id="content" style="display:none">
+    <!-- Objectif mensuel de mandats + batterie de progression -->
+    <div class="card objbar">
+      <div class="oi">
+        <label>Objectif mensuel de mandats</label>
+        <div class="objrow">
+          <input id="objInput" type="number" min="0" inputmode="numeric" placeholder="ex : 30" />
+          <span class="obj-hint" id="objHint"></span>
+        </div>
+      </div>
+      <div class="batt-wrap">
+        <div class="battery" id="battery" title="Progression vers l'objectif de mandats du mois"></div>
+        <div class="batt-cap">objectif</div>
+        <div class="batt-pct" id="battPct"></div>
+      </div>
+    </div>
+
     <!-- Activité : CE / R2 / Mandats en jour · semaine · mois + taux -->
     <div class="grid-act">
       <div class="card tile" id="tileCE"></div>
@@ -222,15 +256,16 @@
           <span><i class="dot" style="background:var(--s-ce)"></i>CE</span>
           <span><i class="dot" style="background:var(--s-r2)"></i>Affaires créées</span>
           <span><i class="dot" style="background:var(--s-mandat)"></i>Mandats</span>
+          <span id="objLeg" style="display:none"><i class="dot dash" style="background:var(--critical)"></i>Objectif CE</span>
         </div>
         <div id="trendChart"></div>
       </div>
       <div class="card">
-        <h2>CA vs remboursements</h2>
+        <h2>Revenus / Pertes</h2>
         <p class="hint">Sur 12 mois — 1 mandat = <span id="mvLabel">500 €</span>.</p>
         <div class="legend">
-          <span><i class="dot" style="background:var(--good)"></i>CA gagné</span>
-          <span><i class="dot" style="background:var(--critical)"></i>Remboursements</span>
+          <span><i class="dot" style="background:var(--good)"></i>Revenus</span>
+          <span><i class="dot" style="background:var(--critical)"></i>Pertes</span>
         </div>
         <div id="finChart"></div>
       </div>
@@ -245,7 +280,7 @@
 <div class="modal-ov" id="ceModal">
   <div class="modal">
     <button class="close" id="ceClose" title="Fermer">×</button>
-    <h3>Détail des CE</h3>
+    <h3 id="ceTitle">Détail</h3>
     <p class="msub" id="ceSub"></p>
     <div id="ceBody" class="mbody"></div>
   </div>
@@ -255,8 +290,9 @@
 <script>
 const $ = (s)=>document.querySelector(s);
 const escapeHtml=(s)=>String(s==null?'':s).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const state = { pipeline:'all', user:'all', gran:'month', raw:null, data:null };
+const state = { pipeline:'all', user:'all', gran:'month', obj:null, raw:null, data:null };
 const tooltip = $('#tooltip');
+(function(){try{const o=localStorage.getItem('pd_obj');if(o){const n=parseInt(o,10);state.obj=(Number.isFinite(n)&&n>0)?n:null;}}catch(_){}})();
 
 const nf = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
 function money(v){ try{return new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v||0);}catch(_){return nf.format(v||0)+' €';} }
@@ -286,10 +322,10 @@ function singleTile(el,label,value,foot){
 }
 
 // ---------- graphique multi-lignes ----------
-function lineChart(el,labels,series,gran){
+function lineChart(el,labels,series,gran,objLevel){
   const W=580,H=250,padL=34,padR=12,padT=14,padB=26,iw=W-padL-padR,ih=H-padT-padB;
   const all=series.flatMap(s=>s.data);
-  const max=Math.max(3,...all);
+  const max=Math.max(3,...all,objLevel||0);
   const n=labels.length;
   const x=(i)=> n<=1?padL+iw/2 : padL+(iw*i)/(n-1);
   const y=(v)=> padT+ih-(v/max)*ih;
@@ -307,17 +343,23 @@ function lineChart(el,labels,series,gran){
     paths+=`<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
     s.data.forEach((v,i)=>{ if(n<=14) paths+=`<circle cx="${x(i)}" cy="${y(v)}" r="2.6" fill="${s.color}"/>`; });
   });
+  // courbe d'objectif (rouge pointillée)
+  let obj='';
+  if(objLevel>0){const oy=y(objLevel);
+    obj=`<line x1="${padL}" y1="${oy}" x2="${W-padR}" y2="${oy}" stroke="var(--critical)" stroke-width="1.8" stroke-dasharray="5 4"/>
+      <text x="${W-padR}" y="${oy-4}" text-anchor="end" font-size="9.5" fill="var(--critical)">objectif ${nf.format(objLevel)}</text>`;}
   // overlay hover
   let hit='';
   labels.forEach((k,i)=>{ const xx=x(i);
     hit+=`<rect x="${xx-iw/n/2}" y="${padT}" width="${Math.max(6,iw/n)}" height="${ih}" fill="transparent" data-i="${i}"/>`;});
   el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img">${grid}${xlab}
     <line id="cross" x1="0" y1="${padT}" x2="0" y2="${padT+ih}" stroke="var(--baseline)" stroke-width="1" style="opacity:0"/>
-    ${paths}${hit}</svg>`;
+    ${obj}${paths}${hit}</svg>`;
   const cross=el.querySelector('#cross');
   el.querySelectorAll('rect[data-i]').forEach(r=>{
     r.onmousemove=(e)=>{const i=+r.dataset.i;cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.style.opacity='1';
-      const rows=series.map(s=>`<span style="color:${s.color}">●</span> ${s.name} : <b>${nf.format(s.data[i])}</b>`).join('<br>');
+      let rows=series.map(s=>`<span style="color:${s.color}">●</span> ${s.name} : <b>${nf.format(s.data[i])}</b>`).join('<br>');
+      if(objLevel>0) rows+=`<br><span style="color:var(--critical)">┈</span> Objectif CE : <b>${nf.format(objLevel)}</b>`;
       showTip(e,`<b>${fmtLabel(labels[i],gran)}</b><br>${rows}`);};
     r.onmouseleave=()=>{cross.style.opacity='0';hideTip();};
   });
@@ -333,7 +375,7 @@ function barChart(el,labels,a,b,colA,colB){
     grid+=`<text x="${padL-6}" y="${yy+3}" text-anchor="end" font-size="10" fill="var(--muted)">${moneyK(val)}</text>`;}
   let bars='';labels.forEach((k,i)=>{const cx=padL+gw*i+gw/2;
     const ha=(a[i]/max)*ih,hb=(b[i]/max)*ih;
-    bars+=`<g data-tip="${fmtLabel(k,'month')} · CA ${money(a[i])} · Remb. ${money(b[i])}">
+    bars+=`<g data-tip="${fmtLabel(k,'month')} · Revenus ${money(a[i])} · Pertes ${money(b[i])}">
       <rect x="${cx-bw-gap/2}" y="${y(a[i])}" width="${bw}" height="${Math.max(0,ha)}" rx="3" fill="${colA}"/>
       <rect x="${cx+gap/2}" y="${y(b[i])}" width="${bw}" height="${Math.max(0,hb)}" rx="3" fill="${colB}"/>
       <rect x="${cx-gw/2}" y="${padT}" width="${gw}" height="${ih}" fill="transparent"/>
@@ -343,26 +385,49 @@ function barChart(el,labels,a,b,colA,colB){
 }
 
 // ---------- rendu ----------
+function addLook(id){ const el=$(id); if(!el)return; el.classList.add('clickable'); el.insertAdjacentHTML('beforeend','<span class="look">détail ›</span>'); }
+// Objectif CE selon la granularité (10% de transfo) : jour = M, semaine = M×5, mois = M×10.
+function objCEForGran(gran){ const M=state.obj; if(!M||M<=0) return 0; return gran==='day'?M:gran==='week'?M*5:M*10; }
+function renderBattery(mandatsMonth){
+  const M=state.obj;
+  const ratio=(M&&M>0)?mandatsMonth/M:0;
+  const filled=Math.max(0,Math.min(10,Math.round(ratio*10)));
+  const color = ratio>=0.9?'var(--good)' : ratio>0.6?'var(--brand-2)' : ratio>=0.4?'#EE9A34' : 'var(--critical)';
+  let cells=''; for(let i=0;i<10;i++) cells+=`<span class="cell" style="background:${i<filled?color:'var(--grid)'}"></span>`;
+  $('#battery').innerHTML=cells;
+  const pctEl=$('#battPct'), hint=$('#objHint'), leg=$('#objLeg');
+  if(M&&M>0){
+    pctEl.textContent=Math.round(ratio*100)+'%'; pctEl.style.color=color;
+    hint.innerHTML=`≈ <b>${nf.format(M)} CE/jour</b> visés (à 10 % de transfo) · ${nf.format(mandatsMonth)}/${nf.format(M)} mandats ce mois`;
+    if(leg) leg.style.display='';
+  } else {
+    pctEl.textContent='—'; pctEl.style.color='var(--muted)';
+    hint.textContent="Saisis un objectif pour activer la jauge et la courbe cible.";
+    if(leg) leg.style.display='none';
+  }
+}
 function render(d){
   const k=d.kpis;
   actTile($('#tileCE'),'CE — Contacts établis','var(--s-ce)',k.ce);
-  const ceTile=$('#tileCE'); ceTile.classList.add('clickable'); ceTile.insertAdjacentHTML('beforeend','<span class="look">détail ›</span>');
   actTile($('#tileR2'),'R2 — Affaires créées','var(--s-r2)',k.r2);
   actTile($('#tileMandat'),'Mandats rentrés','var(--s-mandat)',k.mandats);
   singleTile($('#tileTaux'),'Taux de transformation (mois)',pct(k.tauxTransfo),
     `${nf.format(k.mandats.month)} mandats / ${nf.format(k.ce.month)} CE`);
 
-  singleTile($('#tileCA'),'CA gagné (mois)',money(k.caGagneMonth),`${nf.format(k.wonCountMonth)} affaires facturées × ${money(d.mandatValue)}`);
-  singleTile($('#tilePot'),'Potentiel à venir',money(k.potentiel),`${nf.format(k.potentielCount)} mandats en cours`);
-  singleTile($('#tileRemb'),'Remboursements (mois)',money(k.remboursementsMonth),`${nf.format(k.remboursementsCount)} affaires remboursées`);
+  singleTile($('#tileCA'),'Revenus générés (mois)',money(k.caGagneMonth),`${nf.format(k.wonCountMonth)} dossiers facturés × ${money(d.mandatValue)}`);
+  singleTile($('#tilePot'),'Potentiel revenu',money(k.potentiel),`${nf.format(k.potentielCount)} mandats en cours`);
+  singleTile($('#tileRemb'),'Dossiers remboursés (mois)',money(k.remboursementsMonth),`${nf.format(k.remboursementsCount)} dossiers remboursés`);
+
+  ['#tileCE','#tileR2','#tileMandat','#tileCA','#tilePot','#tileRemb'].forEach(addLook);
+  renderBattery(k.mandats.month);
 
   $('#mvLabel').textContent=money(d.mandatValue);
-  lineChart($('#trendChart'),d.trend.labels,[
-    {name:'CE',color:getComputedStyle(document.body).getPropertyValue('--s-ce'),data:d.trend.ce},
-    {name:'Affaires créées',color:getComputedStyle(document.body).getPropertyValue('--s-r2'),data:d.trend.r2},
-    {name:'Mandats',color:getComputedStyle(document.body).getPropertyValue('--s-mandat'),data:d.trend.mandats},
-  ],d.gran);
   const cs=getComputedStyle(document.body);
+  lineChart($('#trendChart'),d.trend.labels,[
+    {name:'CE',color:cs.getPropertyValue('--s-ce'),data:d.trend.ce},
+    {name:'Affaires créées',color:cs.getPropertyValue('--s-r2'),data:d.trend.r2},
+    {name:'Mandats',color:cs.getPropertyValue('--s-mandat'),data:d.trend.mandats},
+  ],d.gran,objCEForGran(d.gran));
   barChart($('#finChart'),d.finance.labels,d.finance.ca,d.finance.remboursements,cs.getPropertyValue('--good'),cs.getPropertyValue('--critical'));
 }
 
@@ -413,30 +478,53 @@ async function load(){
 function applyTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('pd_theme',t);}catch(_){}}
 (function(){const s=localStorage.getItem('pd_theme');if(s)document.documentElement.setAttribute('data-theme',s);})();
 
-// ---------- vue détail CE ----------
-function periodLabel(g){return g==='day'?"aujourd'hui":g==='week'?'cette semaine':'ce mois-ci';}
-function openCE(){
+// ---------- vue détail (toutes les tuiles) ----------
+const DETAIL={
+  ce:{label:'CE — Contacts établis',period:()=>state.gran},
+  r2:{label:'R2 — Affaires créées',period:()=>state.gran},
+  mandat:{label:'Mandats rentrés',period:()=>state.gran},
+  ca:{label:'Revenus générés',period:()=>'month'},
+  potentiel:{label:'Potentiel revenu',period:()=>'all'},
+  remboursement:{label:'Dossiers remboursés',period:()=>'month'},
+};
+function periodLabel(g){return g==='day'?"aujourd'hui":g==='week'?'cette semaine':g==='all'?'en cours':'ce mois-ci';}
+function openDetail(kind){
   if(!state.raw||!state.mapping)return;
   const nowMs=Date.parse(state.raw.generatedAt)||Date.now();
   const ownerId=state.user==='all'?null:Number(state.user);
-  const list=window.PDStats.ceDetail(state.raw,state.mapping,{nowMs,ownerId,period:state.gran});
+  const period=DETAIL[kind].period();
+  const list=window.PDStats.detail(kind,state.raw,state.mapping,{nowMs,ownerId,period});
   const uname=state.user==='all'?'tous les commerciaux':(($('#userSel').selectedOptions[0]||{}).textContent||'');
-  $('#ceSub').textContent=`${list.length} CE · ${periodLabel(state.gran)} · ${uname}`;
+  $('#ceTitle').textContent='Détail · '+DETAIL[kind].label;
+  $('#ceSub').textContent=`${nf.format(list.length)} · ${periodLabel(period)} · ${uname}`;
   const body=$('#ceBody');
-  if(!list.length){body.innerHTML='<div class="empty">Aucun CE sur cette période avec les filtres actuels.</div>';}
+  if(!list.length){body.innerHTML='<div class="empty">Aucun élément sur cette période avec les filtres actuels.</div>';}
   else{
     body.innerHTML='<table>'+list.map(x=>{
       const d=new Date(x.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
-      const src=x.inLead&&x.inDeal?'<span class="tag lead">prospect</span> <span class="tag deal">affaire</span>':x.inLead?'<span class="tag lead">prospect</span>':'<span class="tag deal">affaire</span>';
-      const appr=x.stamped?'':' <span class="tag appr" title="Daté à la création (Date CE non renseignée)">approx.</span>';
-      return `<tr><td class="dt">${d}</td><td>${escapeHtml(x.title)}</td><td style="text-align:right">${src}${appr}</td></tr>`;
+      let tags;
+      if(x.inLead!==undefined){
+        tags=(x.inLead&&x.inDeal?'<span class="tag lead">prospect</span> <span class="tag deal">affaire</span>':x.inLead?'<span class="tag lead">prospect</span>':'<span class="tag deal">affaire</span>')+(x.stamped?'':' <span class="tag appr" title="Daté à la création">approx.</span>');
+      } else { tags='<span class="tag deal">affaire</span>'; }
+      return `<tr><td class="dt">${d}</td><td>${escapeHtml(x.title)}</td><td style="text-align:right">${tags}</td></tr>`;
     }).join('')+'</table>';
   }
   $('#ceModal').classList.add('on');
 }
-$('#tileCE').addEventListener('click',openCE);
+[['tileCE','ce'],['tileR2','r2'],['tileMandat','mandat'],['tileCA','ca'],['tilePot','potentiel'],['tileRemb','remboursement']].forEach(([id,kind])=>{
+  const el=document.getElementById(id); if(el) el.addEventListener('click',()=>openDetail(kind));
+});
 $('#ceClose').onclick=()=>$('#ceModal').classList.remove('on');
 $('#ceModal').addEventListener('click',(e)=>{if(e.target.id==='ceModal')$('#ceModal').classList.remove('on');});
+
+// ---------- champ objectif ----------
+$('#objInput').value = state.obj||'';
+$('#objInput').oninput=(e)=>{
+  const v=parseInt(e.target.value,10);
+  state.obj=(Number.isFinite(v)&&v>0)?v:null;
+  try{localStorage.setItem('pd_obj',state.obj||'');}catch(_){}
+  if(state.data) render(state.data);
+};
 
 $('#pipelineSel').onchange=(e)=>{state.pipeline=e.target.value;recompute();};
 $('#userSel').onchange=(e)=>{state.user=e.target.value;recompute();};
