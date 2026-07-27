@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="auto">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stats commerciales · Pipedrive</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --page:#f9f9f7; --surface:#fcfcfb; --surface-2:#f3f3ef;
+    --text-primary:#0b0b0b; --text-secondary:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --baseline:#c3c2b7; --border:rgba(11,11,11,.10);
+    --s-ce:#2a78d6; --s-r2:#eb6834; --s-mandat:#1baf7a;
+    --good:#0ca30c; --good-ink:#006300; --warn:#b06f00; --critical:#d03b3b;
+    --radius:14px; --shadow:0 1px 2px rgba(11,11,11,.05),0 4px 16px rgba(11,11,11,.04);
+  }
+  @media (prefers-color-scheme: dark){ :root:where(:not([data-theme="light"])){
+    --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+    --text-primary:#fff; --text-secondary:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,.10);
+    --s-ce:#3987e5; --s-r2:#d95926; --s-mandat:#199e70;
+    --good:#0ca30c; --good-ink:#0ca30c; --warn:#fab219; --critical:#e66767;
+  }}
+  :root[data-theme="dark"]{
+    --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+    --text-primary:#fff; --text-secondary:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,.10);
+    --s-ce:#3987e5; --s-r2:#d95926; --s-mandat:#199e70;
+    --good:#0ca30c; --good-ink:#0ca30c; --warn:#fab219; --critical:#e66767;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--page);color:var(--text-primary);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;line-height:1.45}
+  .wrap{max-width:1160px;margin:0 auto;padding:26px 20px 60px}
+  header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:20px}
+  header.top h1{font-size:20px;margin:0;font-weight:660;letter-spacing:-.01em}
+  .sub{color:var(--text-secondary);font-size:13px;margin-top:2px}
+  .spacer{flex:1}
+  .demo-badge{font-size:12px;font-weight:600;color:var(--warn);border:1px solid var(--border);
+    border-radius:999px;padding:4px 11px;display:none}
+  select,button.ghost{font:inherit;font-size:13px;color:var(--text-primary);background:var(--surface);
+    border:1px solid var(--border);border-radius:10px;padding:8px 12px;cursor:pointer}
+  select:hover,button.ghost:hover{border-color:var(--baseline)}
+  .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:3px}
+  .seg button{font:inherit;font-size:13px;border:0;background:transparent;color:var(--text-secondary);
+    padding:6px 12px;border-radius:8px;cursor:pointer}
+  .seg button.on{background:var(--surface);color:var(--text-primary);font-weight:600;box-shadow:var(--shadow)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+  .grid-act{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-bottom:14px}
+  .tile .label{font-size:12.5px;color:var(--text-secondary);font-weight:600}
+  .tile .label .chip{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px;vertical-align:middle}
+  .jsm{display:flex;gap:0;margin-top:12px}
+  .jsm div{flex:1;text-align:center;border-right:1px solid var(--border)}
+  .jsm div:last-child{border-right:0}
+  .jsm .n{font-size:23px;font-weight:680;letter-spacing:-.02em}
+  .jsm .k{font-size:11px;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:.03em}
+  .jsm .big .n{color:var(--text-primary)}
+  .tile.single .value{font-size:30px;font-weight:690;margin-top:8px;letter-spacing:-.02em}
+  .tile.single .foot{font-size:12.5px;color:var(--muted);margin-top:3px}
+  .grid-fin{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-bottom:18px}
+  .accent-good .value{color:var(--good-ink)} .accent-crit .value{color:var(--critical)}
+  .grid-2{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+  @media (max-width:860px){.grid-2{grid-template-columns:1fr}}
+  .card h2{font-size:15px;margin:0 0 2px;font-weight:620}
+  .card .hint{font-size:12.5px;color:var(--muted);margin:0 0 12px}
+  .legend{display:flex;gap:16px;font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;flex-wrap:wrap}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  svg text{font-family:system-ui,sans-serif}
+  .status{text-align:center;padding:56px 20px;color:var(--text-secondary)}
+  .err{color:var(--critical)}
+  .footnote{font-size:12px;color:var(--muted);margin-top:22px;text-align:center;line-height:1.6}
+  .tt{position:fixed;pointer-events:none;z-index:20;background:var(--text-primary);color:var(--surface);
+    font-size:12px;padding:7px 10px;border-radius:8px;opacity:0;transition:opacity .1s;box-shadow:var(--shadow);white-space:nowrap}
+  .tt b{font-weight:650}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Statistiques commerciales</h1>
+      <div class="sub" id="subline">Chargement…</div>
+    </div>
+    <span class="demo-badge" id="demoBadge">Données de démonstration</span>
+    <div class="spacer"></div>
+    <select id="pipelineSel" title="Pipeline"><option value="all">Tous les pipelines</option></select>
+    <button class="ghost" id="refreshBtn">↻</button>
+    <a class="ghost" href="/api/discover" title="Configuration des champs" style="text-decoration:none;line-height:1">⚙</a>
+    <button class="ghost" id="themeBtn" title="Thème clair / sombre">◑</button>
+  </header>
+
+  <div id="content" style="display:none">
+    <!-- Activité : CE / R2 / Mandats en jour · semaine · mois + taux -->
+    <div class="grid-act">
+      <div class="card tile" id="tileCE"></div>
+      <div class="card tile" id="tileR2"></div>
+      <div class="card tile" id="tileMandat"></div>
+      <div class="card tile single" id="tileTaux"></div>
+    </div>
+
+    <!-- Finance -->
+    <div class="grid-fin">
+      <div class="card tile single accent-good" id="tileCA"></div>
+      <div class="card tile single" id="tilePot"></div>
+      <div class="card tile single accent-crit" id="tileRemb"></div>
+    </div>
+
+    <!-- Graphiques -->
+    <div class="grid-2">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div><h2>Activité dans le temps</h2><p class="hint">CE, affaires créées (R2) et mandats rentrés.</p></div>
+          <div class="seg" id="granSeg">
+            <button data-g="day">Jour</button>
+            <button data-g="week">Semaine</button>
+            <button data-g="month" class="on">Mois</button>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--s-ce)"></i>CE</span>
+          <span><i class="dot" style="background:var(--s-r2)"></i>Affaires créées</span>
+          <span><i class="dot" style="background:var(--s-mandat)"></i>Mandats</span>
+        </div>
+        <div id="trendChart"></div>
+      </div>
+      <div class="card">
+        <h2>CA vs remboursements</h2>
+        <p class="hint">Sur 12 mois — 1 mandat = <span id="mvLabel">500 €</span>.</p>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--good)"></i>CA gagné</span>
+          <span><i class="dot" style="background:var(--critical)"></i>Remboursements</span>
+        </div>
+        <div id="finChart"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status" id="status">Chargement…</div>
+  <div class="footnote" id="foot"></div>
+</div>
+<div class="tt" id="tooltip"></div>
+
+<script>
+const $ = (s)=>document.querySelector(s);
+const state = { pipeline:'all', gran:'month', data:null };
+const tooltip = $('#tooltip');
+
+const nf = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
+function money(v){ try{return new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v||0);}catch(_){return nf.format(v||0)+' €';} }
+function moneyK(v){ return v>=1000 ? (v/1000).toFixed(v>=10000?0:1).replace('.',',')+' k€' : nf.format(Math.round(v))+' €'; }
+const pct=(x)=> x==null?'—':(x*100).toFixed(0)+' %';
+
+function fmtLabel(key,gran){
+  if(gran==='month'){const[y,m]=key.split('-');return new Date(Date.UTC(+y,+m-1,1)).toLocaleDateString('fr-FR',{month:'short'}).replace('.','');}
+  if(gran==='week'){return 'S'+key.split('-W')[1];}
+  const[y,m,d]=key.split('-');return d+'/'+m;
+}
+
+function showTip(e,html){tooltip.innerHTML=html;tooltip.style.opacity='1';const pad=13;let x=e.clientX+pad,y=e.clientY+pad;const r=tooltip.getBoundingClientRect();if(x+r.width>innerWidth)x=e.clientX-r.width-pad;if(y+r.height>innerHeight)y=e.clientY-r.height-pad;tooltip.style.left=x+'px';tooltip.style.top=y+'px';}
+const hideTip=()=>tooltip.style.opacity='0';
+
+// ---------- tuiles activité (jour/semaine/mois) ----------
+function actTile(el,title,color,vals){
+  el.innerHTML=`<div class="label"><i class="chip" style="background:${color}"></i>${title}</div>
+    <div class="jsm">
+      <div><div class="n">${nf.format(vals.day)}</div><div class="k">Jour</div></div>
+      <div><div class="n">${nf.format(vals.week)}</div><div class="k">Semaine</div></div>
+      <div class="big"><div class="n">${nf.format(vals.month)}</div><div class="k">Mois</div></div>
+    </div>`;
+}
+function singleTile(el,label,value,foot){
+  el.innerHTML=`<div class="label">${label}</div><div class="value">${value}</div><div class="foot">${foot||''}</div>`;
+}
+
+// ---------- graphique multi-lignes ----------
+function lineChart(el,labels,series,gran){
+  const W=580,H=250,padL=34,padR=12,padT=14,padB=26,iw=W-padL-padR,ih=H-padT-padB;
+  const all=series.flatMap(s=>s.data);
+  const max=Math.max(3,...all);
+  const n=labels.length;
+  const x=(i)=> n<=1?padL+iw/2 : padL+(iw*i)/(n-1);
+  const y=(v)=> padT+ih-(v/max)*ih;
+  let grid='';
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){const val=Math.round(max/ticks*i);const yy=y(val);
+    grid+=`<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="var(--grid)" stroke-width="1"/>`;
+    grid+=`<text x="${padL-6}" y="${yy+3}" text-anchor="end" font-size="10" fill="var(--muted)">${val}</text>`;}
+  // labels x (sous-échantillonnés)
+  let xlab='';const step=Math.ceil(n/8);
+  labels.forEach((k,i)=>{ if(i%step===0||i===n-1){ xlab+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--muted)">${fmtLabel(k,gran)}</text>`; }});
+  let paths='';
+  series.forEach(s=>{
+    const pts=s.data.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
+    paths+=`<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    s.data.forEach((v,i)=>{ if(n<=14) paths+=`<circle cx="${x(i)}" cy="${y(v)}" r="2.6" fill="${s.color}"/>`; });
+  });
+  // overlay hover
+  let hit='';
+  labels.forEach((k,i)=>{ const xx=x(i);
+    hit+=`<rect x="${xx-iw/n/2}" y="${padT}" width="${Math.max(6,iw/n)}" height="${ih}" fill="transparent" data-i="${i}"/>`;});
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img">${grid}${xlab}
+    <line id="cross" x1="0" y1="${padT}" x2="0" y2="${padT+ih}" stroke="var(--baseline)" stroke-width="1" style="opacity:0"/>
+    ${paths}${hit}</svg>`;
+  const cross=el.querySelector('#cross');
+  el.querySelectorAll('rect[data-i]').forEach(r=>{
+    r.onmousemove=(e)=>{const i=+r.dataset.i;cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.style.opacity='1';
+      const rows=series.map(s=>`<span style="color:${s.color}">●</span> ${s.name} : <b>${nf.format(s.data[i])}</b>`).join('<br>');
+      showTip(e,`<b>${fmtLabel(labels[i],gran)}</b><br>${rows}`);};
+    r.onmouseleave=()=>{cross.style.opacity='0';hideTip();};
+  });
+}
+
+// ---------- graphique barres groupées finance ----------
+function barChart(el,labels,a,b,colA,colB){
+  const W=520,H=250,padL=40,padR=10,padT=14,padB=26,iw=W-padL-padR,ih=H-padT-padB;
+  const max=Math.max(1,...a,...b);const n=labels.length;const gw=iw/n;const bw=Math.min(13,gw*0.34);const gap=2.5;
+  const y=(v)=>padT+ih-(v/max)*ih;
+  let grid='';for(let i=0;i<=4;i++){const val=max/4*i;const yy=y(val);
+    grid+=`<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="var(--grid)" stroke-width="1"/>`;
+    grid+=`<text x="${padL-6}" y="${yy+3}" text-anchor="end" font-size="10" fill="var(--muted)">${moneyK(val)}</text>`;}
+  let bars='';labels.forEach((k,i)=>{const cx=padL+gw*i+gw/2;
+    const ha=(a[i]/max)*ih,hb=(b[i]/max)*ih;
+    bars+=`<g data-tip="${fmtLabel(k,'month')} · CA ${money(a[i])} · Remb. ${money(b[i])}">
+      <rect x="${cx-bw-gap/2}" y="${y(a[i])}" width="${bw}" height="${Math.max(0,ha)}" rx="3" fill="${colA}"/>
+      <rect x="${cx+gap/2}" y="${y(b[i])}" width="${bw}" height="${Math.max(0,hb)}" rx="3" fill="${colB}"/>
+      <rect x="${cx-gw/2}" y="${padT}" width="${gw}" height="${ih}" fill="transparent"/>
+      <text x="${cx}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--muted)">${fmtLabel(k,'month')}</text></g>`;});
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img">${grid}${bars}</svg>`;
+  el.querySelectorAll('g[data-tip]').forEach(g=>{g.onmousemove=(e)=>showTip(e,g.dataset.tip);g.onmouseleave=hideTip;});
+}
+
+// ---------- rendu ----------
+function render(d){
+  const k=d.kpis;
+  actTile($('#tileCE'),'CE — Contacts établis','var(--s-ce)',k.ce);
+  actTile($('#tileR2'),'R2 — Affaires créées','var(--s-r2)',k.r2);
+  actTile($('#tileMandat'),'Mandats rentrés','var(--s-mandat)',k.mandats);
+  singleTile($('#tileTaux'),'Taux de transformation (mois)',pct(k.tauxTransfo),
+    `${nf.format(k.mandats.month)} mandats / ${nf.format(k.ce.month)} CE`);
+
+  singleTile($('#tileCA'),'CA gagné (mois)',money(k.caGagneMonth),`${nf.format(k.wonCountMonth)} affaires facturées × ${money(d.mandatValue)}`);
+  singleTile($('#tilePot'),'Potentiel à venir',money(k.potentiel),`${nf.format(k.potentielCount)} mandats en cours`);
+  singleTile($('#tileRemb'),'Remboursements (mois)',money(k.remboursementsMonth),`${nf.format(k.remboursementsCount)} affaires remboursées`);
+
+  $('#mvLabel').textContent=money(d.mandatValue);
+  lineChart($('#trendChart'),d.trend.labels,[
+    {name:'CE',color:getComputedStyle(document.body).getPropertyValue('--s-ce'),data:d.trend.ce},
+    {name:'Affaires créées',color:getComputedStyle(document.body).getPropertyValue('--s-r2'),data:d.trend.r2},
+    {name:'Mandats',color:getComputedStyle(document.body).getPropertyValue('--s-mandat'),data:d.trend.mandats},
+  ],d.gran);
+  const cs=getComputedStyle(document.body);
+  barChart($('#finChart'),d.finance.labels,d.finance.ca,d.finance.remboursements,cs.getPropertyValue('--good'),cs.getPropertyValue('--critical'));
+}
+
+async function load(){
+  $('#status').style.display='block';$('#status').className='status';$('#status').textContent='Chargement…';$('#content').style.display='none';
+  try{
+    const res=await fetch(`/api/stats?gran=${state.gran}&pipeline=${encodeURIComponent(state.pipeline)}`);
+    const d=await res.json();
+    if(d.error) throw new Error(d.message||'Erreur inconnue');
+    state.data=d;
+    const sel=$('#pipelineSel');
+    if(sel.dataset.filled!=='1'&&d.pipelines&&d.pipelines.length){
+      d.pipelines.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
+      sel.dataset.filled='1';sel.value=state.pipeline;
+    }
+    $('#demoBadge').style.display=d.demo?'inline-block':'none';
+    const when=new Date(d.generatedAt).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
+    $('#subline').textContent=(d.demo?'Aperçu avec données simulées':'Vos données Pipedrive')+' · maj '+when;
+    $('#foot').innerHTML=d.demo
+      ? (d.reason==='no_token'
+          ? "Mode démo : configurez PIPEDRIVE_DOMAIN et PIPEDRIVE_API_TOKEN pour vos données réelles."
+          : "Mode démo : le mapping des champs (CE, règlement mandat) n'est pas encore renseigné — voir README / <code>node scripts/discover.js</code>.")
+      : '';
+    render(d);
+    $('#status').style.display='none';$('#content').style.display='block';
+  }catch(e){$('#status').className='status err';$('#status').textContent='⚠ '+e.message;$('#content').style.display='none';}
+}
+
+function applyTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('pd_theme',t);}catch(_){}}
+(function(){const s=localStorage.getItem('pd_theme');if(s)document.documentElement.setAttribute('data-theme',s);})();
+
+$('#pipelineSel').onchange=(e)=>{state.pipeline=e.target.value;load();};
+$('#refreshBtn').onclick=load;
+$('#granSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  state.gran=b.dataset.g;$('#granSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));load();
+});
+$('#themeBtn').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');
+  const dark=c==='dark'||(c!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);
+  applyTheme(dark?'light':'dark');if(state.data)render(state.data);};
+
+load();
+</script>
+</body>
+</html>

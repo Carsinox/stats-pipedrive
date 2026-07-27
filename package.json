@@ -1,0 +1,13 @@
+{
+  "name": "pipedrive-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tableau de bord commercial simplifié relié à Pipedrive (API v2)",
+  "scripts": {
+    "dev": "node dev-server.js",
+    "test": "node test/stats.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "_comment": "Alternative aux variables d'environnement. Copie en config.json et remplis avec la sortie de `node scripts/discover.js`. Les variables d'env ont priorité sur ce fichier.",
+
+  "mandatValue": 500,
+
+  "pipelines": [],
+
+  "mandatDateField": "REMPLACER_PAR_LA_KEY_DU_CHAMP_DATE_REGLEMENT_MANDAT",
+
+  "ceField": "REMPLACER_PAR_LA_KEY_DU_CHAMP_RESULTAT_APPEL",
+  "ceValues": ["REMPLACER_PAR_L_OPTION_ID_DE_CONTACT_ETABLI"],
+  "ceActivityTypes": ["call"]
+}
