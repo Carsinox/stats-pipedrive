@@ -75,13 +75,18 @@ const MAPd = { ...MAP, ceDateField: 'cedate' };
 const leadsD = [
   // prospect importé le 01/07, passé "Contact établi" le 15/07 (champ Date CE stampé)
   { person_id: 20, title: 'Import LBC', owner_id: 101, add_time: iso(2026, 7, 1), custom_fields: { cr: 21, cedate: '2026-07-15' } },
+  // créé aujourd'hui, Contact établi, MAIS sans Date CE -> ne doit PAS compter (mode strict)
+  { person_id: 21, title: 'Sans Date CE', owner_id: 101, add_time: iso(2026, 7, 15), custom_fields: { cr: 21 } },
 ];
 const scd = computeStats({ deals: [], leads: leadsD, pipelines }, MAPd, { nowMs: NOW, gran: 'day' });
 check('CE daté par le champ Date CE (stampé), pas par la création', () => {
   const i15 = scd.trend.labels.indexOf('2026-07-15');
   const i01 = scd.trend.labels.indexOf('2026-07-01');
-  assert.strictEqual(scd.trend.ce[i15], 1);
+  assert.strictEqual(scd.trend.ce[i15], 1); // seule la fiche stampée compte, le 15
   assert.strictEqual(i01 === -1 ? 0 : scd.trend.ce[i01], 0);
+});
+check('mode strict : une fiche sans Date CE ne compte pas', () => {
+  assert.strictEqual(scd.kpis.ce.month, 1); // 1 stampée, pas 2
 });
 
 // ---------- démo cohérente ----------

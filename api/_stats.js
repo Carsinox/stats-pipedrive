@@ -159,9 +159,10 @@ function computeStats({ deals = [], activities = [], persons = [], leads = [], p
       // Date du CE : le champ "Date CE" stampé par l'automatisation (exact, gère les
       // prospects importés marqués plus tard) ; à défaut, repli sur la création.
       const stampedTs = mapping.ceDateField ? parseTs(getCF(en, mapping.ceDateField)) : null;
-      // Date CE stampée en priorité ; à défaut, date de création (historique).
-      // update_time n'est plus utilisé (il bougeait à chaque édition).
-      const ts = stampedTs || parseTs(en.add_time);
+      // Si un champ "Date CE" est configuré, on compte STRICTEMENT par cette date
+      // (identique au filtre Date CE de Pipedrive) : une fiche sans Date CE ne compte pas.
+      // Sinon (pas de champ configuré / démo), repli sur la date de création.
+      const ts = mapping.ceDateField ? stampedTs : parseTs(en.add_time);
       if (!ts) return;
       const pid = personIdOf(en);
       const tt = normTitle(en.title);

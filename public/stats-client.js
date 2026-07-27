@@ -126,8 +126,9 @@
         if (!matchesCE(getCF(en, mapping.ceField), mapping.ceValues)) return;
         // Date du CE : champ "Date CE" stampé par l'automatisation (exact), sinon création.
         const stampedTs = mapping.ceDateField ? parseTs(getCF(en, mapping.ceDateField)) : null;
-        // Date CE stampée en priorité ; à défaut, date de création. Plus d'update_time.
-        const ts = stampedTs || parseTs(en.add_time);
+        // Champ Date CE configuré -> comptage STRICT par cette date (comme Pipedrive) ;
+        // sinon repli sur la création (démo / champ non configuré).
+        const ts = mapping.ceDateField ? stampedTs : parseTs(en.add_time);
         if (!ts) return;
         const pid = personIdOf(en);
         const tt = normTitle(en.title);
@@ -193,7 +194,7 @@
       if (!ownedBy(en)) return;
       if (!matchesCE(getCF(en, mapping.ceField), mapping.ceValues)) return;
       const stampedTs = mapping.ceDateField ? parseTs(getCF(en, mapping.ceDateField)) : null;
-      const ts = stampedTs || parseTs(en.add_time);
+      const ts = mapping.ceDateField ? stampedTs : parseTs(en.add_time);
       if (!ts) return;
       const pid = personIdOf(en);
       const tt = normTitle(en.title);
