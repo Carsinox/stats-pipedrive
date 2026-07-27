@@ -130,8 +130,9 @@ PIPEDRIVE_MANDAT_VALUE=500`;
           (f) => esc(f.name)])}
       </table></div>
 
-      <h2>Champs à choix des AFFAIRES <span class="pill">→ résultat d'appel ?</span></h2>
-      <div class="card">${choiceTable(dealFields, ceSource === 'deal' && ce ? ce.field.key : null, ceSource === 'deal' && ce && ce.option ? ce.option.id : null)}</div>
+      <h2>Champs à choix des AFFAIRES / LEADS (prospects) <span class="pill">→ résultat d'appel ?</span></h2>
+      <p class="muted" style="margin:-6px 0 6px">Dans Pipedrive, les leads partagent ces champs avec les affaires. Si ton « résultat d'appel » est ici, mets <code>PIPEDRIVE_CE_SOURCE=lead</code>.</p>
+      <div class="card">${choiceTable(dealFields, ce && (ceSource === 'deal') ? ce.field.key : null, ce && ce.option && ceSource === 'deal' ? ce.option.id : null)}</div>
 
       <h2>Champs à choix des CONTACTS <span class="pill">→ résultat d'appel ?</span></h2>
       <div class="card">${choiceTable(personFields, ceSource === 'person' && ce ? ce.field.key : null, ceSource === 'person' && ce && ce.option ? ce.option.id : null)}</div>

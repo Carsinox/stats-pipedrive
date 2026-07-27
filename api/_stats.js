@@ -90,15 +90,25 @@ function countInCurrent(events, nowMs, gran) {
   return n;
 }
 
-function computeStats({ deals = [], activities = [], persons = [], pipelines = [] }, mapping, opts) {
+// Récupère l'id du propriétaire (owner), que l'API renvoie un nombre ou un objet.
+function ownerOf(entity) {
+  const o = entity && (entity.owner_id !== undefined ? entity.owner_id : entity.user_id);
+  if (o == null) return null;
+  if (typeof o === 'object') return Number(o.id != null ? o.id : o.value);
+  return Number(o);
+}
+
+function computeStats({ deals = [], activities = [], persons = [], leads = [], pipelines = [] }, mapping, opts) {
   const nowMs = opts.nowMs;
   const gran = opts.gran || 'month';
   const mv = mapping.mandatValue || 500;
+  const ownerId = opts.ownerId ? Number(opts.ownerId) : null;
 
   const pipeFilter = (mapping.pipelines && mapping.pipelines.length) ? new Set(mapping.pipelines.map(Number)) : null;
   const inScope = (d) => !pipeFilter || pipeFilter.has(Number(d.pipeline_id));
+  const ownedBy = (e) => !ownerId || ownerOf(e) === ownerId;
 
-  const dScoped = deals.filter((d) => d.status !== 'deleted' && inScope(d));
+  const dScoped = deals.filter((d) => d.status !== 'deleted' && inScope(d) && ownedBy(d));
 
   // ----- Événements CE -----
   // Le champ "résultat d'appel = Contact établi" peut vivre sur l'activité (défaut),
@@ -119,12 +129,16 @@ function computeStats({ deals = [], activities = [], persons = [], pipelines = [
         if (ts) ceEvents.push(ts);
       }
     } else {
-      // Source 'deal' ou 'person' : on compte les entités marquées "Contact établi",
-      // datées par leur création (meilleure date disponible sans historique de champ).
-      const entities = src === 'person' ? persons : dScoped;
+      // Source 'person' (contact/prospect), 'lead' ou 'deal' : on compte les entités
+      // marquées "Contact établi", datées par leur création (meilleure date disponible
+      // sans historique de champ), filtrées par owner sélectionné.
+      const entities = src === 'person' ? persons : src === 'lead' ? leads : dScoped;
       for (const en of entities) {
+        if (!ownedBy(en)) continue;
         if (!matchesCE(getCF(en, mapping.ceField), mapping.ceValues)) continue;
-        const ts = parseTs(en.add_time) || parseTs(en.update_time);
+        // Daté à la DERNIÈRE MISE À JOUR de la fiche (au plus proche du moment où
+        // le prospect a été nommé "Contact établi"), avec repli sur la création.
+        const ts = parseTs(en.update_time) || parseTs(en.add_time);
         if (ts) ceEvents.push(ts);
       }
     }
@@ -195,10 +209,15 @@ function computeStats({ deals = [], activities = [], persons = [], pipelines = [
     remboursements: months.map((m) => rembByMonth.get(m)),
   };
 
+  // Pipelines proposés dans le menu : restreints à ceux configurés (VPA Bordeaux, VPA La Réunion).
+  const pipeList = (pipelines || [])
+    .filter((p) => !pipeFilter || pipeFilter.has(Number(p.id)))
+    .map((p) => ({ id: p.id, name: p.name }));
+
   return {
     mandatValue: mv,
     gran,
-    pipelines: (pipelines || []).map((p) => ({ id: p.id, name: p.name })),
+    pipelines: pipeList,
     kpis: {
       ce, r2, mandats,
       tauxTransfo,

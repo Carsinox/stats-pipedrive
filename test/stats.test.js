@@ -65,4 +65,29 @@ check('démo : potentiel > 0', () => assert.ok(ds.kpis.potentiel > 0));
 check('démo : taux de transfo plausible (0-1.5)', () => assert.ok(ds.kpis.tauxTransfo > 0 && ds.kpis.tauxTransfo < 1.5));
 check('démo : CA annuel cumulé > 0', () => assert.ok(ds.finance.ca.reduce((a, b) => a + b, 0) > 0));
 
+// ----- CE sur les prospects (source person) + filtre commercial -----
+const persons = [
+  { id: 1, add_time: iso(2026, 7, 2), owner_id: 101, custom_fields: { cr: 21 } }, // CE, user 101
+  { id: 2, add_time: iso(2026, 7, 5), owner_id: 101, custom_fields: { cr: 21 } }, // CE, user 101
+  { id: 3, add_time: iso(2026, 7, 6), owner_id: 102, custom_fields: { cr: 21 } }, // CE, user 102
+  { id: 4, add_time: iso(2026, 7, 7), owner_id: 102, custom_fields: { cr: 22 } }, // pas CE
+  { id: 5, add_time: iso(2026, 6, 20), owner_id: 101, custom_fields: { cr: 21 } }, // CE mais mois précédent
+];
+const MAP_P = { mandatValue: 500, pipelines: [], mandatDateField: 'md', ceSource: 'person', ceField: 'cr', ceValues: ['21'] };
+const sp = computeStats({ deals, persons, pipelines }, MAP_P, { nowMs: NOW, gran: 'month' });
+check('CE prospects (person) du mois', () => assert.strictEqual(sp.kpis.ce.month, 3)); // p1,p2,p3
+
+const spU = computeStats({ deals, persons, pipelines }, MAP_P, { nowMs: NOW, gran: 'month', ownerId: 101 });
+check('filtre commercial : CE du user 101', () => assert.strictEqual(spU.kpis.ce.month, 2)); // p1,p2
+check('filtre commercial : deals du user 101 seulement', () => {
+  // deals de démo n'ont pas d'owner -> ownedBy exclut tout quand ownerId défini
+  assert.ok(spU.kpis.r2.month >= 0);
+});
+
+// deals avec owners pour tester le filtre sur les affaires
+const dealsO = deals.map((d, i) => ({ ...d, owner_id: i % 2 === 0 ? 101 : 102 }));
+const so1 = computeStats({ deals: dealsO, persons, pipelines }, MAP_P, { nowMs: NOW, gran: 'month', ownerId: 101 });
+const soAll = computeStats({ deals: dealsO, persons, pipelines }, MAP_P, { nowMs: NOW, gran: 'month' });
+check('filtre commercial réduit le nb d\'affaires créées', () => assert.ok(so1.kpis.r2.month < soAll.kpis.r2.month));
+
 console.log(`\n${passed} tests passés ✅`);

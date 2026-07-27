@@ -84,6 +84,7 @@
     </div>
     <span class="demo-badge" id="demoBadge">Données de démonstration</span>
     <div class="spacer"></div>
+    <select id="userSel" title="Commercial"><option value="all">Tous les commerciaux</option></select>
     <select id="pipelineSel" title="Pipeline"><option value="all">Tous les pipelines</option></select>
     <button class="ghost" id="refreshBtn">↻</button>
     <a class="ghost" href="/api/discover" title="Configuration des champs" style="text-decoration:none;line-height:1">⚙</a>
@@ -143,7 +144,7 @@
 
 <script>
 const $ = (s)=>document.querySelector(s);
-const state = { pipeline:'all', gran:'month', data:null };
+const state = { pipeline:'all', user:'all', gran:'month', data:null };
 const tooltip = $('#tooltip');
 
 const nf = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
@@ -256,7 +257,7 @@ function render(d){
 async function load(){
   $('#status').style.display='block';$('#status').className='status';$('#status').textContent='Chargement…';$('#content').style.display='none';
   try{
-    const res=await fetch(`/api/stats?gran=${state.gran}&pipeline=${encodeURIComponent(state.pipeline)}`);
+    const res=await fetch(`/api/stats?gran=${state.gran}&pipeline=${encodeURIComponent(state.pipeline)}&user=${encodeURIComponent(state.user)}`);
     const d=await res.json();
     if(d.error) throw new Error(d.message||'Erreur inconnue');
     state.data=d;
@@ -264,6 +265,11 @@ async function load(){
     if(sel.dataset.filled!=='1'&&d.pipelines&&d.pipelines.length){
       d.pipelines.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
       sel.dataset.filled='1';sel.value=state.pipeline;
+    }
+    const usel=$('#userSel');
+    if(usel.dataset.filled!=='1'&&d.users&&d.users.length){
+      d.users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.name;usel.appendChild(o);});
+      usel.dataset.filled='1';usel.value=state.user;
     }
     $('#demoBadge').style.display=d.demo?'inline-block':'none';
     const when=new Date(d.generatedAt).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
@@ -282,6 +288,7 @@ function applyTheme(t){document.documentElement.setAttribute('data-theme',t);try
 (function(){const s=localStorage.getItem('pd_theme');if(s)document.documentElement.setAttribute('data-theme',s);})();
 
 $('#pipelineSel').onchange=(e)=>{state.pipeline=e.target.value;load();};
+$('#userSel').onchange=(e)=>{state.user=e.target.value;load();};
 $('#refreshBtn').onclick=load;
 $('#granSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   state.gran=b.dataset.g;$('#granSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));load();
