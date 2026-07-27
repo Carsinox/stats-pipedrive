@@ -5,108 +5,193 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Stats commerciales · Pipedrive</title>
 <style>
-  :root {
-    color-scheme: light dark;
-    --page:#f9f9f7; --surface:#fcfcfb; --surface-2:#f3f3ef;
-    --text-primary:#0b0b0b; --text-secondary:#52514e; --muted:#898781;
-    --grid:#e1e0d9; --baseline:#c3c2b7; --border:rgba(11,11,11,.10);
-    --s-ce:#2a78d6; --s-r2:#eb6834; --s-mandat:#1baf7a;
-    --good:#0ca30c; --good-ink:#006300; --warn:#b06f00; --critical:#d03b3b;
-    --radius:14px; --shadow:0 1px 2px rgba(11,11,11,.05),0 4px 16px rgba(11,11,11,.04);
+  :root{
+    color-scheme:light dark;
+    /* Marque VPA */
+    --brand:#859CB6; --brand-2:#6C87A4; --brand-ink:#2A3B4E; --brand-soft:#EAEFF5;
+    /* Surfaces & texte (clair) */
+    --page:#EEF2F7; --surface:#FFFFFF; --surface-2:#F3F6FA;
+    --text-primary:#1B2733; --text-secondary:#5C6B7A; --muted:#94A2B0;
+    --grid:#E5EBF1; --baseline:#CBD5E0; --border:rgba(42,59,78,.10);
+    /* Séries data */
+    --s-ce:#3E6D9C; --s-r2:#E08A3C; --s-mandat:#2E9E6B;
+    --good:#1F9D57; --good-ink:#157A43; --warn:#C77B18; --critical:#D9534F;
+    --radius:16px; --radius-sm:12px;
+    --shadow:0 1px 2px rgba(42,59,78,.06),0 8px 24px rgba(42,59,78,.06);
+    --shadow-lg:0 12px 40px rgba(42,59,78,.16);
   }
-  @media (prefers-color-scheme: dark){ :root:where(:not([data-theme="light"])){
-    --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
-    --text-primary:#fff; --text-secondary:#c3c2b7; --muted:#898781;
-    --grid:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,.10);
-    --s-ce:#3987e5; --s-r2:#d95926; --s-mandat:#199e70;
-    --good:#0ca30c; --good-ink:#0ca30c; --warn:#fab219; --critical:#e66767;
+  @media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){
+    --brand:#94ABC6; --brand-2:#7C97B5; --brand-ink:#0F1A26; --brand-soft:#1B2836;
+    --page:#0E141B; --surface:#172230; --surface-2:#1E2C3B;
+    --text-primary:#EAF1F8; --text-secondary:#A7B6C4; --muted:#6E7F90;
+    --grid:#223141; --baseline:#324556; --border:rgba(255,255,255,.09);
+    --s-ce:#6FA0CE; --s-r2:#EAA35C; --s-mandat:#35B27C;
+    --good:#2CB86A; --good-ink:#3ECB7B; --warn:#E0A23A; --critical:#E8706B;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+    --shadow-lg:0 16px 48px rgba(0,0,0,.5);
   }}
   :root[data-theme="dark"]{
-    --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
-    --text-primary:#fff; --text-secondary:#c3c2b7; --muted:#898781;
-    --grid:#2c2c2a; --baseline:#383835; --border:rgba(255,255,255,.10);
-    --s-ce:#3987e5; --s-r2:#d95926; --s-mandat:#199e70;
-    --good:#0ca30c; --good-ink:#0ca30c; --warn:#fab219; --critical:#e66767;
+    --brand:#94ABC6; --brand-2:#7C97B5; --brand-ink:#0F1A26; --brand-soft:#1B2836;
+    --page:#0E141B; --surface:#172230; --surface-2:#1E2C3B;
+    --text-primary:#EAF1F8; --text-secondary:#A7B6C4; --muted:#6E7F90;
+    --grid:#223141; --baseline:#324556; --border:rgba(255,255,255,.09);
+    --s-ce:#6FA0CE; --s-r2:#EAA35C; --s-mandat:#35B27C;
+    --good:#2CB86A; --good-ink:#3ECB7B; --warn:#E0A23A; --critical:#E8706B;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+    --shadow-lg:0 16px 48px rgba(0,0,0,.5);
   }
   *{box-sizing:border-box} html,body{margin:0}
   body{background:var(--page);color:var(--text-primary);
-    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;line-height:1.45}
-  .wrap{max-width:1160px;margin:0 auto;padding:26px 20px 60px}
-  header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:20px}
-  header.top h1{font-size:20px;margin:0;font-weight:660;letter-spacing:-.01em}
-  .sub{color:var(--text-secondary);font-size:13px;margin-top:2px}
-  .spacer{flex:1}
-  .demo-badge{font-size:12px;font-weight:600;color:var(--warn);border:1px solid var(--border);
-    border-radius:999px;padding:4px 11px;display:none}
-  select,button.ghost{font:inherit;font-size:13px;color:var(--text-primary);background:var(--surface);
-    border:1px solid var(--border);border-radius:10px;padding:8px 12px;cursor:pointer}
-  select:hover,button.ghost:hover{border-color:var(--baseline)}
-  .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:3px}
-  .seg button{font:inherit;font-size:13px;border:0;background:transparent;color:var(--text-secondary);
-    padding:6px 12px;border-radius:8px;cursor:pointer}
-  .seg button.on{background:var(--surface);color:var(--text-primary);font-weight:600;box-shadow:var(--shadow)}
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.45}
+
+  /* ---------- App bar (marque VPA) ---------- */
+  .appbar{position:sticky;top:0;z-index:25;background:linear-gradient(120deg,var(--brand-ink),var(--brand-2));
+    color:#fff;box-shadow:0 2px 14px rgba(42,59,78,.22)}
+  .appbar-inner{max-width:1180px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:14px}
+  .brand{display:flex;align-items:center;gap:12px;min-width:0}
+  .logo{width:42px;height:42px;border-radius:12px;flex:none;display:grid;place-items:center;font-weight:800;
+    letter-spacing:.5px;font-size:15px;color:var(--brand-ink);
+    background:linear-gradient(160deg,#fff,#DCE5EF);box-shadow:0 2px 8px rgba(0,0,0,.18)}
+  .brand-title{font-size:16px;font-weight:700;letter-spacing:-.01em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub{color:rgba(255,255,255,.72);font-size:12px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .appbar-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .demo-badge{font-size:11px;font-weight:700;color:#fff;background:rgba(255,255,255,.18);
+    border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:4px 10px;display:none;white-space:nowrap}
+  .icon-btn{width:38px;height:38px;flex:none;display:grid;place-items:center;font-size:16px;cursor:pointer;
+    color:#fff;text-decoration:none;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.20);
+    border-radius:11px;transition:background .15s,transform .1s}
+  .icon-btn:hover{background:rgba(255,255,255,.24)} .icon-btn:active{transform:scale(.94)}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 18px 64px}
+
+  /* ---------- Filtres ---------- */
+  .controls{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+  select{font:inherit;font-size:14px;color:var(--text-primary);background:var(--surface);
+    border:1px solid var(--border);border-radius:12px;padding:11px 13px;cursor:pointer;flex:1;min-width:150px;
+    box-shadow:var(--shadow);transition:border-color .15s,box-shadow .15s;
+    -webkit-appearance:none;appearance:none;
+    background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+    background-position:calc(100% - 18px) 18px,calc(100% - 13px) 18px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:34px}
+  select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 28%,transparent)}
+
+  /* ---------- Cartes ---------- */
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
-  .grid-act{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-bottom:14px}
-  .tile .label{font-size:12.5px;color:var(--text-secondary);font-weight:600}
+  .grid-act{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+  .grid-fin{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+  .grid-2{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+
+  .tile{position:relative;overflow:hidden}
+  .tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent,var(--brand));opacity:.9}
+  #tileCE::before{background:var(--s-ce)} #tileR2::before{background:var(--s-r2)} #tileMandat::before{background:var(--s-mandat)}
+  #tileTaux::before{background:var(--brand)} #tileCA::before{background:var(--good)} #tilePot::before{background:var(--brand)} #tileRemb::before{background:var(--critical)}
+  .tile .label{font-size:12.5px;color:var(--text-secondary);font-weight:650;letter-spacing:.01em}
   .tile .label .chip{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px;vertical-align:middle}
-  .jsm{display:flex;gap:0;margin-top:12px}
+  .jsm{display:flex;margin-top:14px}
   .jsm div{flex:1;text-align:center;border-right:1px solid var(--border)}
   .jsm div:last-child{border-right:0}
-  .jsm .n{font-size:23px;font-weight:680;letter-spacing:-.02em}
-  .jsm .k{font-size:11px;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:.03em}
-  .jsm .big .n{color:var(--text-primary)}
-  .tile.single .value{font-size:30px;font-weight:690;margin-top:8px;letter-spacing:-.02em}
-  .tile.single .foot{font-size:12.5px;color:var(--muted);margin-top:3px}
-  .grid-fin{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-bottom:18px}
+  .jsm .n{font-size:24px;font-weight:750;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+  .jsm .k{font-size:10.5px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+  .jsm .big .n{color:var(--brand-2)}
+  .tile.single .value{font-size:31px;font-weight:760;margin-top:10px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+  .tile.single .foot{font-size:12.5px;color:var(--muted);margin-top:4px}
   .accent-good .value{color:var(--good-ink)} .accent-crit .value{color:var(--critical)}
-  .grid-2{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
-  @media (max-width:860px){.grid-2{grid-template-columns:1fr}}
-  .card h2{font-size:15px;margin:0 0 2px;font-weight:620}
+  .tile.clickable{cursor:pointer;transition:transform .12s,box-shadow .15s,border-color .15s}
+  .tile.clickable:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:color-mix(in srgb,var(--s-ce) 40%,var(--border))}
+  .tile .look{position:absolute;top:14px;right:16px;font-size:11.5px;font-weight:600;color:var(--brand-2);opacity:.85}
+  .tile.clickable .label{padding-right:50px}
+  .icon-btn svg{display:block}
+
+  .card h2{font-size:15px;margin:0 0 2px;font-weight:700;letter-spacing:-.01em}
   .card .hint{font-size:12.5px;color:var(--muted);margin:0 0 12px}
-  .legend{display:flex;gap:16px;font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;flex-wrap:wrap}
+  .chart-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .legend{display:flex;gap:14px;font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;flex-wrap:wrap}
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
   svg text{font-family:system-ui,sans-serif}
-  .status{text-align:center;padding:56px 20px;color:var(--text-secondary)}
+
+  /* ---------- Segmented (jour/semaine/mois) ---------- */
+  .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:3px}
+  .seg button{font:inherit;font-size:13px;border:0;background:transparent;color:var(--text-secondary);
+    padding:7px 13px;border-radius:8px;cursor:pointer;transition:color .15s;font-weight:600}
+  .seg button.on{background:var(--surface);color:var(--brand-2);box-shadow:0 1px 4px rgba(42,59,78,.14)}
+
+  .status{text-align:center;padding:64px 20px;color:var(--text-secondary)}
   .err{color:var(--critical)}
   .footnote{font-size:12px;color:var(--muted);margin-top:22px;text-align:center;line-height:1.6}
-  .tile.clickable{cursor:pointer;position:relative}
-  .tile.clickable:hover{border-color:var(--baseline)}
-  .tile .look{position:absolute;top:12px;right:14px;font-size:12px;color:var(--muted)}
-  .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;z-index:30;padding:40px 16px;overflow:auto}
+
+  /* ---------- Modal détail ---------- */
+  .modal-ov{position:fixed;inset:0;background:rgba(15,26,38,.55);backdrop-filter:blur(3px);display:none;
+    align-items:flex-start;justify-content:center;z-index:40;padding:40px 16px;overflow:auto}
   .modal-ov.on{display:flex}
-  .modal{background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;max-width:600px;width:100%;box-shadow:var(--shadow);padding:18px 20px}
-  .modal h3{margin:0 0 2px;font-size:16px}
+  .modal{background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:16px;
+    max-width:600px;width:100%;box-shadow:var(--shadow-lg);padding:18px 20px}
+  .modal h3{margin:0 0 2px;font-size:16px;font-weight:700}
   .modal .msub{color:var(--text-secondary);font-size:13px;margin:0 0 12px}
   .modal table{width:100%;border-collapse:collapse;font-size:13.5px}
-  .modal td{padding:7px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
-  .modal td.dt{color:var(--text-secondary);white-space:nowrap;width:1%}
-  .modal .tag{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap}
-  .modal .tag.lead{color:var(--s-ce);border-color:var(--s-ce)}
-  .modal .tag.deal{color:var(--s-r2);border-color:var(--s-r2)}
-  .modal .tag.appr{color:var(--warn);border-color:var(--warn)}
-  .modal .close{float:right;cursor:pointer;border:0;background:transparent;font-size:22px;color:var(--muted);line-height:1}
+  .modal td{padding:9px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
+  .modal tr:last-child td{border-bottom:0}
+  .modal td.dt{color:var(--text-secondary);white-space:nowrap;width:1%;font-variant-numeric:tabular-nums}
+  .modal .tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap}
+  .modal .tag.lead{color:var(--s-ce);border-color:color-mix(in srgb,var(--s-ce) 45%,transparent)}
+  .modal .tag.deal{color:var(--s-r2);border-color:color-mix(in srgb,var(--s-r2) 45%,transparent)}
+  .modal .tag.appr{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+  .modal .close{float:right;cursor:pointer;border:0;background:var(--surface-2);width:32px;height:32px;border-radius:9px;font-size:20px;color:var(--muted);line-height:1}
+  .modal .close:hover{color:var(--text-primary)}
   .modal .empty{color:var(--muted);font-size:13px;padding:14px 0}
-  .tt{position:fixed;pointer-events:none;z-index:20;background:var(--text-primary);color:var(--surface);
-    font-size:12px;padding:7px 10px;border-radius:8px;opacity:0;transition:opacity .1s;box-shadow:var(--shadow);white-space:nowrap}
-  .tt b{font-weight:650}
+  .modal .mbody{max-height:60vh;overflow:auto}
+
+  .tt{position:fixed;pointer-events:none;z-index:35;background:var(--brand-ink);color:#fff;
+    font-size:12px;padding:8px 11px;border-radius:9px;opacity:0;transition:opacity .1s;box-shadow:var(--shadow-lg);white-space:nowrap}
+  .tt b{font-weight:700}
+
+  /* ---------- Responsive ---------- */
+  @media (max-width:920px){ .grid-2{grid-template-columns:1fr} }
+  @media (max-width:720px){
+    .grid-act{grid-template-columns:repeat(2,1fr)}
+    .grid-fin{grid-template-columns:1fr}
+    .brand-title{font-size:15px}
+  }
+  @media (max-width:560px){
+    .wrap{padding:14px 13px 56px}
+    .appbar-inner{padding:11px 13px;gap:10px}
+    .logo{width:38px;height:38px}
+    .card{padding:15px;border-radius:14px}
+    .controls{gap:8px}
+    select{min-width:0;font-size:13.5px;padding:11px 30px 11px 12px}
+    .jsm .n{font-size:21px} .tile.single .value{font-size:27px}
+    .icon-btn{width:36px;height:36px}
+    .modal-ov{padding:0;align-items:flex-end}
+    .modal{max-width:100%;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+    .modal .mbody{max-height:70vh}
+  }
+  @media (max-width:380px){ .grid-act{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div>
-      <h1>Statistiques commerciales</h1>
-      <div class="sub" id="subline">Chargement…</div>
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="brand">
+      <div class="logo">VPA</div>
+      <div style="min-width:0">
+        <div class="brand-title">Statistiques commerciales</div>
+        <div class="sub" id="subline">Chargement…</div>
+      </div>
     </div>
-    <span class="demo-badge" id="demoBadge">Données de démonstration</span>
-    <div class="spacer"></div>
+    <div class="appbar-actions">
+      <span class="demo-badge" id="demoBadge">Démo</span>
+      <button class="icon-btn" id="refreshBtn" title="Actualiser">↻</button>
+      <a class="icon-btn" href="/api/discover" title="Configuration des champs">⚙</a>
+      <button class="icon-btn" id="themeBtn" title="Thème clair / sombre" aria-label="Thème">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.4 A6.6 6.6 0 0 1 8 14.6 Z" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div class="wrap">
+  <div class="controls">
     <select id="userSel" title="Commercial"><option value="all">Tous les commerciaux</option></select>
     <select id="pipelineSel" title="Pipeline"><option value="all">Tous les pipelines</option></select>
-    <button class="ghost" id="refreshBtn">↻</button>
-    <a class="ghost" href="/api/discover" title="Configuration des champs" style="text-decoration:none;line-height:1">⚙</a>
-    <button class="ghost" id="themeBtn" title="Thème clair / sombre">◑</button>
-  </header>
+  </div>
 
   <div id="content" style="display:none">
     <!-- Activité : CE / R2 / Mandats en jour · semaine · mois + taux -->
@@ -127,7 +212,7 @@
     <!-- Graphiques -->
     <div class="grid-2">
       <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div class="chart-head">
           <div><h2>Activité dans le temps</h2><p class="hint">CE, affaires créées (R2) et mandats rentrés.</p></div>
           <div class="seg" id="granSeg">
             <button data-g="day">Jour</button>
@@ -164,7 +249,7 @@
     <button class="close" id="ceClose" title="Fermer">×</button>
     <h3>Détail des CE</h3>
     <p class="msub" id="ceSub"></p>
-    <div id="ceBody"></div>
+    <div id="ceBody" class="mbody"></div>
   </div>
 </div>
 
