@@ -109,7 +109,8 @@ function normTitle(s) {
   return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 // Regroupe des candidats CE qui partagent la même personne OU le même titre
-// (union-find), et renvoie le timestamp le plus ancien de chaque groupe.
+// (union-find). Pour chaque groupe : si une date "stampée" (champ Date CE) existe,
+// on prend la plus ancienne date stampée ; sinon la plus ancienne date de repli.
 function ceGroupTimes(cands) {
   const parent = cands.map((_, i) => i);
   const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
@@ -122,13 +123,15 @@ function ceGroupTimes(cands) {
       else keyToNode.set(k, i);
     }
   });
-  const groupMin = new Map();
+  const stampedMin = new Map(), anyMin = new Map();
   cands.forEach((c, i) => {
     const r = find(i);
-    const cur = groupMin.get(r);
-    if (cur === undefined || c.t < cur) groupMin.set(r, c.t);
+    if (anyMin.get(r) === undefined || c.t < anyMin.get(r)) anyMin.set(r, c.t);
+    if (c.stamped && (stampedMin.get(r) === undefined || c.t < stampedMin.get(r))) stampedMin.set(r, c.t);
   });
-  return [...groupMin.values()];
+  const out = [];
+  for (const r of anyMin.keys()) out.push(stampedMin.has(r) ? stampedMin.get(r) : anyMin.get(r));
+  return out;
 }
 
 function computeStats({ deals = [], activities = [], persons = [], leads = [], pipelines = [] }, mapping, opts) {
@@ -153,11 +156,14 @@ function computeStats({ deals = [], activities = [], persons = [], leads = [], p
     const collect = (en) => {
       if (!ownedBy(en)) return;
       if (!matchesCE(getCF(en, mapping.ceField), mapping.ceValues)) return;
-      const ts = parseTs(en.update_time) || parseTs(en.add_time);
+      // Date du CE : le champ "Date CE" stampé par l'automatisation (exact, gère les
+      // prospects importés marqués plus tard) ; à défaut, repli sur la création.
+      const stampedTs = mapping.ceDateField ? parseTs(getCF(en, mapping.ceDateField)) : null;
+      const ts = stampedTs || parseTs(en.add_time) || parseTs(en.update_time);
       if (!ts) return;
       const pid = personIdOf(en);
       const tt = normTitle(en.title);
-      cands.push({ t: ts.getTime(), pk: pid ? 'p:' + pid : null, tk: tt ? 't:' + tt : null });
+      cands.push({ t: ts.getTime(), stamped: !!stampedTs, pk: pid ? 'p:' + pid : null, tk: tt ? 't:' + tt : null });
     };
     for (const l of leads) collect(l);       // prospects (leads)
     for (const d of dScoped) collect(d);      // affaires (scope pipeline + owner)

@@ -92,9 +92,15 @@
         else keyToNode.set(k, i);
       }
     });
-    const groupMin = new Map();
-    cands.forEach((c, i) => { const r = find(i); const cur = groupMin.get(r); if (cur === undefined || c.t < cur) groupMin.set(r, c.t); });
-    return [...groupMin.values()];
+    const stampedMin = new Map(), anyMin = new Map();
+    cands.forEach((c, i) => {
+      const r = find(i);
+      if (anyMin.get(r) === undefined || c.t < anyMin.get(r)) anyMin.set(r, c.t);
+      if (c.stamped && (stampedMin.get(r) === undefined || c.t < stampedMin.get(r))) stampedMin.set(r, c.t);
+    });
+    const out = [];
+    for (const r of anyMin.keys()) out.push(stampedMin.has(r) ? stampedMin.get(r) : anyMin.get(r));
+    return out;
   }
 
   function computeStats(data, mapping, opts) {
@@ -118,11 +124,13 @@
       const collect = (en) => {
         if (!ownedBy(en)) return;
         if (!matchesCE(getCF(en, mapping.ceField), mapping.ceValues)) return;
-        const ts = parseTs(en.update_time) || parseTs(en.add_time);
+        // Date du CE : champ "Date CE" stampé par l'automatisation (exact), sinon création.
+        const stampedTs = mapping.ceDateField ? parseTs(getCF(en, mapping.ceDateField)) : null;
+        const ts = stampedTs || parseTs(en.add_time) || parseTs(en.update_time);
         if (!ts) return;
         const pid = personIdOf(en);
         const tt = normTitle(en.title);
-        cands.push({ t: ts.getTime(), pk: pid ? 'p:' + pid : null, tk: tt ? 't:' + tt : null });
+        cands.push({ t: ts.getTime(), stamped: !!stampedTs, pk: pid ? 'p:' + pid : null, tk: tt ? 't:' + tt : null });
       };
       for (const l of leads) collect(l);
       for (const d of dScoped) collect(d);

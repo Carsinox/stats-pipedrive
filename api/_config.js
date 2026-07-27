@@ -38,6 +38,10 @@ function getMapping() {
     ceSource: (e.PIPEDRIVE_CE_SOURCE || f.ceSource || 'activity'),
     // Champ "résultat de l'appel" (clé API hashée) + valeur "Contact établi".
     ceField: e.PIPEDRIVE_CE_FIELD || f.ceField || '',
+    // (Optionnel mais recommandé) Champ DATE rempli par une automatisation Pipedrive
+    // le jour où "résultat d'appel" passe à "Contact établi". Sert à dater le CE
+    // exactement (sinon repli sur la date de création de la fiche).
+    ceDateField: e.PIPEDRIVE_CE_DATE_FIELD || f.ceDateField || '',
     // Peut être un ID d'option (nombre) ou le libellé exact. Plusieurs valeurs possibles.
     ceValues: (list(e.PIPEDRIVE_CE_VALUES).length ? list(e.PIPEDRIVE_CE_VALUES)
       : (Array.isArray(f.ceValues) ? f.ceValues : (f.ceValue ? [f.ceValue] : []))),

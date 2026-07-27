@@ -82,6 +82,8 @@ module.exports = async (req, res) => {
 
     // --- détection mandat (champ date) ---
     const guessMandat = dateFields.find((f) => /r[èe]glement|r[ée]gl[ée]|mandat/i.test(f.name || ''));
+    // --- détection champ Date CE (rempli par l'automatisation) ---
+    const guessCeDate = dateFields.find((f) => /contact\s*[ée]tabli|date\s*ce\b|\bce\b/i.test(f.name || ''));
 
     // --- détection CE : cherche "Contact établi" sur affaire, contact, puis activité ---
     let ce = null, ceSource = '';
@@ -102,6 +104,7 @@ module.exports = async (req, res) => {
 PIPEDRIVE_MANDAT_DATE_FIELD=${guessMandat ? guessMandat.key : 'REMPLACER'}
 PIPEDRIVE_CE_FIELD=${ce ? ce.field.key : 'REMPLACER'}
 PIPEDRIVE_CE_VALUES=${ce && ce.option ? ce.option.id : 'REMPLACER'}
+PIPEDRIVE_CE_DATE_FIELD=${guessCeDate ? guessCeDate.key : '(créer le champ + automatisation — voir guide)'}
 PIPEDRIVE_MANDAT_VALUE=500`;
 
     const detected = guessMandat && ce && ce.option;
@@ -126,7 +129,7 @@ PIPEDRIVE_MANDAT_VALUE=500`;
       <h2>Champs date d'affaire <span class="pill">→ règlement mandat</span></h2>
       <div class="card"><table><tr><th>Clé (key)</th><th>Nom</th></tr>
         ${rows(dateFields, [
-          (f) => `<span class="key">${esc(f.key)}</span>${guessMandat && f.key === guessMandat.key ? ' <span class="ok">← détecté</span>' : ''}`,
+          (f) => `<span class="key">${esc(f.key)}</span>${guessMandat && f.key === guessMandat.key ? ' <span class="ok">← mandat</span>' : ''}${guessCeDate && f.key === guessCeDate.key ? ' <span class="ok">← Date CE</span>' : ''}`,
           (f) => esc(f.name)])}
       </table></div>
 

@@ -26,27 +26,27 @@ function customFields(e, keys) {
   for (const k of keys) if (k) out[k] = cf(e, k);
   return out;
 }
-// Affaire allégée (inclut le champ mandat ET le champ résultat d'appel pour le CE).
-function slimDeal(d, mandatKey, ceKey) {
+// Affaire allégée (inclut mandat, résultat d'appel, et date CE si présents).
+function slimDeal(d, mandatKey, ceKey, ceDateKey) {
   return {
     pipeline_id: Number(d.pipeline_id) || null, status: d.status,
     owner_id: ownerId(d), person_id: personId(d), title: d.title,
     add_time: d.add_time, update_time: d.update_time, won_time: d.won_time, lost_time: d.lost_time,
-    custom_fields: customFields(d, [mandatKey, ceKey]),
+    custom_fields: customFields(d, [mandatKey, ceKey, ceDateKey]),
   };
 }
 // Lead (prospect) allégé.
-function slimLead(l, ceKey) {
+function slimLead(l, ceKey, ceDateKey) {
   return {
     owner_id: ownerId(l), person_id: personId(l), title: l.title,
     add_time: l.add_time, update_time: l.update_time,
-    custom_fields: customFields(l, [ceKey]),
+    custom_fields: customFields(l, [ceKey, ceDateKey]),
   };
 }
 function publicMapping(m) {
   return {
     mandatValue: m.mandatValue, pipelines: m.pipelines, mandatDateField: m.mandatDateField,
-    ceField: m.ceField, ceValues: m.ceValues,
+    ceField: m.ceField, ceValues: m.ceValues, ceDateField: m.ceDateField,
   };
 }
 
@@ -68,8 +68,8 @@ module.exports = async (req, res) => {
       mapping: publicMapping(m),
       pipelines: demo.pipelines.map((p) => ({ id: p.id, name: p.name })),
       users: demo.users || [],
-      deals: demo.deals.map((d) => slimDeal(d, m.mandatDateField, m.ceField)),
-      leads: (demo.leads || []).map((l) => slimLead(l, m.ceField)),
+      deals: demo.deals.map((d) => slimDeal(d, m.mandatDateField, m.ceField, m.ceDateField)),
+      leads: (demo.leads || []).map((l) => slimLead(l, m.ceField, m.ceDateField)),
     }));
     return;
   }
@@ -104,8 +104,8 @@ module.exports = async (req, res) => {
       demo: false, generatedAt: new Date(nowMs).toISOString(),
       mapping: publicMapping(mapping),
       pipelines: pipeList, users,
-      deals: deals.map((d) => slimDeal(d, mapping.mandatDateField, mapping.ceField)),
-      leads: leads.map((l) => slimLead(l, mapping.ceField)),
+      deals: deals.map((d) => slimDeal(d, mapping.mandatDateField, mapping.ceField, mapping.ceDateField)),
+      leads: leads.map((l) => slimLead(l, mapping.ceField, mapping.ceDateField)),
     }));
   } catch (err) {
     const status = err.status || 500;

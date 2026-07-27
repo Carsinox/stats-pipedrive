@@ -70,6 +70,20 @@ check('dédup : total CE sur la fenêtre = 5 (4 juillet + 1 juin)', () => {
   assert.strictEqual(total, 5);
 });
 
+// ---------- date CE stampée (automatisation) prime sur la création ----------
+const MAPd = { ...MAP, ceDateField: 'cedate' };
+const leadsD = [
+  // prospect importé le 01/07, passé "Contact établi" le 15/07 (champ Date CE stampé)
+  { person_id: 20, title: 'Import LBC', owner_id: 101, add_time: iso(2026, 7, 1), custom_fields: { cr: 21, cedate: '2026-07-15' } },
+];
+const scd = computeStats({ deals: [], leads: leadsD, pipelines }, MAPd, { nowMs: NOW, gran: 'day' });
+check('CE daté par le champ Date CE (stampé), pas par la création', () => {
+  const i15 = scd.trend.labels.indexOf('2026-07-15');
+  const i01 = scd.trend.labels.indexOf('2026-07-01');
+  assert.strictEqual(scd.trend.ce[i15], 1);
+  assert.strictEqual(i01 === -1 ? 0 : scd.trend.ce[i01], 0);
+});
+
 // ---------- démo cohérente ----------
 const demo = buildDemo(NOW);
 const ds = computeStats(demo, demo.mapping, { nowMs: NOW, gran: 'month' });
