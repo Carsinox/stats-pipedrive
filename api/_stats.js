@@ -90,7 +90,7 @@ function countInCurrent(events, nowMs, gran) {
   return n;
 }
 
-function computeStats({ deals = [], activities = [], pipelines = [] }, mapping, opts) {
+function computeStats({ deals = [], activities = [], persons = [], pipelines = [] }, mapping, opts) {
   const nowMs = opts.nowMs;
   const gran = opts.gran || 'month';
   const mv = mapping.mandatValue || 500;
@@ -100,18 +100,34 @@ function computeStats({ deals = [], activities = [], pipelines = [] }, mapping, 
 
   const dScoped = deals.filter((d) => d.status !== 'deleted' && inScope(d));
 
-  // ----- Événements CE (activités) -----
+  // ----- Événements CE -----
+  // Le champ "résultat d'appel = Contact établi" peut vivre sur l'activité (défaut),
+  // sur l'affaire ou sur le contact, selon la configuration Pipedrive.
   const ceEvents = [];
-  for (const a of activities) {
-    if (a.done === false) continue;
-    if (mapping.ceActivityTypes && mapping.ceActivityTypes.length) {
-      if (!mapping.ceActivityTypes.map(String).includes(String(a.type))) continue;
+  if (mapping.ceField && mapping.ceValues && mapping.ceValues.length) {
+    const src = mapping.ceSource || 'activity';
+    if (src === 'activity') {
+      for (const a of activities) {
+        if (a.done === false) continue;
+        if (mapping.ceActivityTypes && mapping.ceActivityTypes.length) {
+          if (!mapping.ceActivityTypes.map(String).includes(String(a.type))) continue;
+        }
+        if (!matchesCE(getCF(a, mapping.ceField), mapping.ceValues)) continue;
+        const ts = parseTs(a.marked_as_done_time)
+          || parseTs(a.due_date ? `${a.due_date}${a.due_time ? 'T' + a.due_time + ':00Z' : ''}` : null)
+          || parseTs(a.update_time) || parseTs(a.add_time);
+        if (ts) ceEvents.push(ts);
+      }
+    } else {
+      // Source 'deal' ou 'person' : on compte les entités marquées "Contact établi",
+      // datées par leur création (meilleure date disponible sans historique de champ).
+      const entities = src === 'person' ? persons : dScoped;
+      for (const en of entities) {
+        if (!matchesCE(getCF(en, mapping.ceField), mapping.ceValues)) continue;
+        const ts = parseTs(en.add_time) || parseTs(en.update_time);
+        if (ts) ceEvents.push(ts);
+      }
     }
-    if (!matchesCE(getCF(a, mapping.ceField), mapping.ceValues)) continue;
-    const ts = parseTs(a.marked_as_done_time)
-      || parseTs(a.due_date ? `${a.due_date}${a.due_time ? 'T' + a.due_time + ':00Z' : ''}` : null)
-      || parseTs(a.update_time) || parseTs(a.add_time);
-    if (ts) ceEvents.push(ts);
   }
 
   // ----- Événements R2 (affaires créées) -----

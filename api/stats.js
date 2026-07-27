@@ -39,12 +39,16 @@ module.exports = async (req, res) => {
 
   // ---- Mode réel ----
   try {
-    const [pipelines, deals, activities] = await Promise.all([
+    const source = mapping.ceSource || 'activity';
+    const needActivities = !mapping.ceField || source === 'activity';
+    const needPersons = source === 'person' && !!mapping.ceField;
+    const [pipelines, deals, activities, persons] = await Promise.all([
       pdGetAll('/pipelines'),
       pdGetAll('/deals'),
-      pdGetAll('/activities', { done: true }),
+      needActivities ? pdGetAll('/activities', { done: true }) : Promise.resolve([]),
+      needPersons ? pdGetAll('/persons') : Promise.resolve([]),
     ]);
-    const stats = computeStats({ pipelines, deals, activities }, mapping, { nowMs, gran });
+    const stats = computeStats({ pipelines, deals, activities, persons }, mapping, { nowMs, gran });
     res.statusCode = 200;
     res.end(JSON.stringify({ demo: false, generatedAt: new Date(nowMs).toISOString(), ...stats }));
   } catch (err) {

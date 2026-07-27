@@ -34,7 +34,9 @@ function getMapping() {
     // Affaires — champ personnalisé "date de règlement mandat" (clé API hashée).
     mandatDateField: e.PIPEDRIVE_MANDAT_DATE_FIELD || f.mandatDateField || '',
 
-    // Activités — champ "résultat de l'appel" (clé API hashée) + valeur "Contact établi".
+    // Où vit le champ "résultat d'appel" : 'activity' (défaut), 'deal' ou 'person'.
+    ceSource: (e.PIPEDRIVE_CE_SOURCE || f.ceSource || 'activity'),
+    // Champ "résultat de l'appel" (clé API hashée) + valeur "Contact établi".
     ceField: e.PIPEDRIVE_CE_FIELD || f.ceField || '',
     // Peut être un ID d'option (nombre) ou le libellé exact. Plusieurs valeurs possibles.
     ceValues: (list(e.PIPEDRIVE_CE_VALUES).length ? list(e.PIPEDRIVE_CE_VALUES)
@@ -47,8 +49,9 @@ function getMapping() {
 }
 
 // Le mapping est-il suffisamment rempli pour interroger les vraies données ?
+// Le champ "règlement mandat" suffit à basculer en réel (le CE peut être ajouté ensuite).
 function isMapped(m) {
-  return Boolean(m.mandatDateField && m.ceField && m.ceValues.length);
+  return Boolean(m.mandatDateField);
 }
 
 module.exports = { getMapping, isMapped };
