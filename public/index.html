@@ -132,6 +132,8 @@
   .seg button.on{background:var(--surface);color:var(--brand-2);box-shadow:0 1px 4px rgba(42,59,78,.14)}
 
   .status{text-align:center;padding:64px 20px;color:var(--text-secondary)}
+  .spinner{width:36px;height:36px;border:3px solid var(--grid);border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}
+  @keyframes spin{to{transform:rotate(360deg)}}
   .err{color:var(--critical)}
   .footnote{font-size:12px;color:var(--muted);margin-top:22px;text-align:center;line-height:1.6}
 
@@ -444,34 +446,51 @@ function recompute(){
   render(state.data);
 }
 
-// Charge les données brutes UNE fois, puis remplit les menus.
-async function load(){
-  $('#status').style.display='block';$('#status').className='status';$('#status').textContent='Chargement des données…';$('#content').style.display='none';
+// ---------- chargement (cache navigateur + rafraîchissement en tâche de fond) ----------
+const DATA_TTL=10*60*1000; // 10 min
+function readCache(){ try{const r=sessionStorage.getItem('pd_data'),ts=+sessionStorage.getItem('pd_data_ts')||0; if(r&&Date.now()-ts<DATA_TTL) return JSON.parse(r);}catch(_){} return null; }
+function writeCache(d){ try{sessionStorage.setItem('pd_data',JSON.stringify(d));sessionStorage.setItem('pd_data_ts',Date.now());}catch(_){} }
+function fetchData(force){ return fetch('/api/data'+(force?('?fresh='+Date.now()):'')).then(r=>r.json()); }
+
+function applyData(d){
+  state.raw=d;
+  const sel=$('#pipelineSel');
+  if(sel.dataset.filled!=='1'&&d.pipelines&&d.pipelines.length){
+    d.pipelines.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
+    sel.dataset.filled='1';sel.value=state.pipeline;
+  }
+  const usel=$('#userSel');
+  if(usel.dataset.filled!=='1'&&d.users&&d.users.length){
+    d.users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.name;usel.appendChild(o);});
+    usel.dataset.filled='1';usel.value=state.user;
+  }
+  $('#demoBadge').style.display=d.demo?'inline-block':'none';
+  const when=new Date(d.generatedAt).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
+  $('#subline').textContent=(d.demo?'Aperçu avec données simulées':'Vos données Pipedrive')+' · maj '+when;
+  $('#foot').innerHTML=d.demo
+    ? (d.reason==='no_token'
+        ? "Mode démo : configurez PIPEDRIVE_DOMAIN et PIPEDRIVE_API_TOKEN pour vos données réelles."
+        : "Mode démo : le mapping des champs n'est pas encore renseigné — voir la page ⚙ Configuration.")
+    : '';
+  recompute();
+  $('#status').style.display='none';$('#content').style.display='block';
+}
+async function refreshBg(){ try{const d=await fetchData(false); if(!d.error){writeCache(d);applyData(d);}}catch(_){} }
+
+async function load(force){
+  // Visite suivante dans la session : affichage instantané depuis le cache, puis MAJ silencieuse.
+  if(!force){
+    const cached=readCache();
+    if(cached){ applyData(cached); refreshBg(); return; }
+  }
+  $('#content').style.display='none';
+  $('#status').style.display='block';$('#status').className='status';
+  $('#status').innerHTML='<div class="spinner"></div>Chargement de vos données…<div style="font-size:12.5px;color:var(--muted);margin-top:6px">Le premier chargement peut prendre quelques secondes.</div>';
   try{
-    const res=await fetch('/api/data');
-    const d=await res.json();
+    const d=await fetchData(force);
     if(d.error) throw new Error(d.message||'Erreur inconnue');
-    state.raw=d;
-    const sel=$('#pipelineSel');
-    if(sel.dataset.filled!=='1'&&d.pipelines&&d.pipelines.length){
-      d.pipelines.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
-      sel.dataset.filled='1';sel.value=state.pipeline;
-    }
-    const usel=$('#userSel');
-    if(usel.dataset.filled!=='1'&&d.users&&d.users.length){
-      d.users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.name;usel.appendChild(o);});
-      usel.dataset.filled='1';usel.value=state.user;
-    }
-    $('#demoBadge').style.display=d.demo?'inline-block':'none';
-    const when=new Date(d.generatedAt).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
-    $('#subline').textContent=(d.demo?'Aperçu avec données simulées':'Vos données Pipedrive')+' · maj '+when;
-    $('#foot').innerHTML=d.demo
-      ? (d.reason==='no_token'
-          ? "Mode démo : configurez PIPEDRIVE_DOMAIN et PIPEDRIVE_API_TOKEN pour vos données réelles."
-          : "Mode démo : le mapping des champs (CE, règlement mandat) n'est pas encore renseigné — voir la page ⚙ Configuration.")
-      : '';
-    recompute();
-    $('#status').style.display='none';$('#content').style.display='block';
+    writeCache(d);
+    applyData(d);
   }catch(e){$('#status').className='status err';$('#status').textContent='⚠ '+e.message;$('#content').style.display='none';}
 }
 
@@ -528,7 +547,7 @@ $('#objInput').oninput=(e)=>{
 
 $('#pipelineSel').onchange=(e)=>{state.pipeline=e.target.value;recompute();};
 $('#userSel').onchange=(e)=>{state.user=e.target.value;recompute();};
-$('#refreshBtn').onclick=load;
+$('#refreshBtn').onclick=()=>load(true);
 $('#granSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   state.gran=b.dataset.g;$('#granSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));recompute();
 });

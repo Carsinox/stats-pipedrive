@@ -53,7 +53,9 @@ function publicMapping(m) {
 module.exports = async (req, res) => {
   const nowMs = Date.now();
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=600');
+  // Sert une version fraîche 5 min, puis sert instantanément la version en cache
+  // tout en la rafraîchissant en tâche de fond (l'utilisateur n'attend plus).
+  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
 
   const cfg = getConfig();
   const mapping = getMapping();
