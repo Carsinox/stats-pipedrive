@@ -22,6 +22,9 @@ try {
 const statsHandler = require('./api/stats');
 const dataHandler = require('./api/data');
 const discoverHandler = require('./api/discover');
+const loginHandler = require('./api/login');
+const logoutHandler = require('./api/logout');
+const sessionHandler = require('./api/session');
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon' };
@@ -36,6 +39,15 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === '/api/discover') {
     return discoverHandler(req, res);
+  }
+  if (url.pathname === '/api/login') {
+    return loginHandler(req, res);
+  }
+  if (url.pathname === '/api/logout') {
+    return logoutHandler(req, res);
+  }
+  if (url.pathname === '/api/session') {
+    return sessionHandler(req, res);
   }
   let file = url.pathname === '/' ? '/index.html' : url.pathname;
   const full = path.join(PUBLIC, path.normalize(file));

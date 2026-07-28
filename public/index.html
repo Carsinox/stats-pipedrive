@@ -200,6 +200,23 @@
     font-size:12px;padding:8px 11px;border-radius:9px;opacity:0;transition:opacity .1s;box-shadow:var(--shadow-lg);white-space:nowrap}
   .tt b{font-weight:700}
 
+  /* ---------- Écran de connexion ---------- */
+  .login-gate{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;
+    background:linear-gradient(140deg,var(--brand-ink),var(--brand-2))}
+  .login-wrap{width:100%;max-width:370px;display:flex;flex-direction:column;align-items:center;gap:20px}
+  .login-logo{height:54px;width:auto;display:block}
+  .login-box{width:100%;background:var(--surface);border-radius:18px;padding:26px 24px;
+    box-shadow:0 24px 60px rgba(0,0,0,.34);display:flex;flex-direction:column;gap:13px;text-align:center;box-sizing:border-box}
+  .login-box h2{font-size:17px;font-weight:800;color:var(--text-primary);margin:0}
+  .login-box p{font-size:13px;color:var(--text-secondary);margin:0 0 4px;line-height:1.45}
+  .login-box input{width:100%;padding:13px 14px;border-radius:11px;border:1.5px solid var(--border);
+    background:var(--surface-2);color:var(--text-primary);font-size:15px;box-sizing:border-box}
+  .login-box input:focus{outline:none;border-color:var(--brand-2)}
+  .login-box button{width:100%;padding:13px;border:none;border-radius:11px;
+    background:linear-gradient(120deg,var(--brand-ink),var(--brand-2));color:#fff;font-weight:800;font-size:15px;cursor:pointer}
+  .login-box button:disabled{opacity:.6;cursor:default}
+  .login-err{min-height:15px;font-size:12.5px;color:var(--critical);font-weight:650}
+
   /* ---------- Responsive ---------- */
   @media (max-width:980px){ .grid-fin{grid-template-columns:repeat(2,1fr)} }
   @media (max-width:920px){ .grid-2{grid-template-columns:1fr} }
@@ -226,6 +243,19 @@
 </style>
 </head>
 <body>
+<!-- Écran de connexion (affiché uniquement si un mot de passe est configuré et l'utilisateur non connecté) -->
+<div id="loginGate" class="login-gate" style="display:none">
+  <div class="login-wrap">
+    <img class="login-logo" src="logo.png" alt="VPA — Votre Projet Auto" />
+    <form class="login-box" id="loginForm">
+      <h2>Statistiques commerciales</h2>
+      <p>Accès réservé à l'équipe VPA.<br>Entrez le mot de passe pour continuer.</p>
+      <input id="loginPw" type="password" placeholder="Mot de passe" autocomplete="current-password" required />
+      <button type="submit" id="loginBtn">Se connecter</button>
+      <div class="login-err" id="loginErr"></div>
+    </form>
+  </div>
+</div>
 <header class="appbar">
   <div class="appbar-inner">
     <div class="brand">
@@ -242,6 +272,7 @@
       <button class="icon-btn" id="themeBtn" title="Thème clair / sombre" aria-label="Thème">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.4 A6.6 6.6 0 0 1 8 14.6 Z" fill="currentColor"/></svg>
       </button>
+      <button class="icon-btn" id="logoutBtn" title="Se déconnecter" aria-label="Se déconnecter" style="display:none">⎋</button>
     </div>
   </div>
 </header>
@@ -619,7 +650,7 @@ function applyData(d){
   recompute();
   $('#status').style.display='none';$('#content').style.display='block';
 }
-async function refreshBg(){ try{const d=await fetchData(false); if(!d.error){writeCache(d);applyData(d);}}catch(_){} }
+async function refreshBg(){ try{const d=await fetchData(false); if(d&&d.auth){showGate(true);return;} if(!d.error){writeCache(d);applyData(d);}}catch(_){} }
 
 async function load(force){
   // Visite suivante dans la session : affichage instantané depuis le cache, puis MAJ silencieuse.
@@ -632,6 +663,7 @@ async function load(force){
   $('#status').innerHTML='<div class="spinner"></div>Chargement de vos données…<div style="font-size:12.5px;color:var(--muted);margin-top:6px">Le premier chargement peut prendre quelques secondes.</div>';
   try{
     const d=await fetchData(force);
+    if(d&&d.auth){ showGate(true); return; }
     if(d.error) throw new Error(d.message||'Erreur inconnue');
     writeCache(d);
     applyData(d);
@@ -716,7 +748,40 @@ $('#themeBtn').onclick=()=>{const c=document.documentElement.getAttribute('data-
   const dark=c==='dark'||(c!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);
   applyTheme(dark?'light':'dark');if(state.data)render(state.data);};
 
-load();
+// ---------- authentification (mot de passe partagé) ----------
+let appStarted=false;
+function startApp(){ if(appStarted) return; appStarted=true; load(); }
+function showGate(show){ $('#loginGate').style.display=show?'flex':'none'; if(show){ const p=$('#loginPw'); if(p) setTimeout(()=>p.focus(),40); } }
+
+$('#loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const btn=$('#loginBtn'), err=$('#loginErr'), pw=$('#loginPw');
+  err.textContent=''; btn.disabled=true; btn.textContent='Connexion…';
+  try{
+    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw.value})});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok && j.ok){ showGate(false); pw.value=''; $('#logoutBtn').style.display=''; startApp(); }
+    else { err.textContent=j.message||'Mot de passe incorrect.'; pw.select(); }
+  }catch(_){ err.textContent='Connexion impossible, réessayez.'; }
+  finally{ btn.disabled=false; btn.textContent='Se connecter'; }
+});
+
+$('#logoutBtn').onclick=async ()=>{
+  try{ await fetch('/api/logout',{method:'POST'}); }catch(_){}
+  try{ sessionStorage.removeItem('pd_data'); sessionStorage.removeItem('pd_data_ts'); }catch(_){}
+  location.reload();
+};
+
+(async function initAuth(){
+  try{
+    const s=await fetch('/api/session',{cache:'no-store'}).then(r=>r.json());
+    if(s.required) $('#logoutBtn').style.display=s.authed?'':'none';
+    if(!s.required || s.authed){ showGate(false); startApp(); }
+    else { showGate(true); }
+  }catch(_){ // en cas d'échec réseau, on tente quand même de charger (le serveur re-vérifiera)
+    showGate(false); startApp();
+  }
+})();
 </script>
 </body>
 </html>

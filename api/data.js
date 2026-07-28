@@ -5,6 +5,7 @@
 const { getConfig, pdGet, pdGetAll, pdGetAllV1 } = require('./_pipedrive');
 const { getMapping, isMapped } = require('./_config');
 const { buildDemo } = require('./_demo');
+const { isAuthed } = require('./_auth');
 
 function ownerId(e) {
   const o = e && (e.owner_id !== undefined ? e.owner_id : e.user_id);
@@ -53,6 +54,15 @@ function publicMapping(m) {
 module.exports = async (req, res) => {
   const nowMs = Date.now();
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
+  // Verrou : sans session valide (quand un mot de passe est configuré), on refuse l'accès aux données.
+  if (!isAuthed(req)) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.statusCode = 401;
+    res.end(JSON.stringify({ error: true, auth: true, status: 401, message: 'Connexion requise.' }));
+    return;
+  }
+
   // Sert une version fraîche 5 min, puis sert instantanément la version en cache
   // tout en la rafraîchissant en tâche de fond (l'utilisateur n'attend plus).
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
