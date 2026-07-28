@@ -4,6 +4,7 @@
 // avec détection automatique et un bloc de configuration prêt à copier.
 
 const { getConfig, pdGet, pdGetAll, pdGetAllV1 } = require('./_pipedrive');
+const { isAuthed } = require('./_auth');
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -58,6 +59,17 @@ function choiceTable(fields, detectedKey, detectedOptId) {
 
 module.exports = async (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+
+  // Page technique (structure du CRM) : réservée aux utilisateurs connectés.
+  if (!isAuthed(req)) {
+    res.statusCode = 401;
+    res.end(page(`<h1>Accès refusé</h1><div class="card"><p>Cette page de configuration est réservée. <a class="btn" href="/">← Se connecter</a></p></div>`));
+    return;
+  }
+
   const cfg = getConfig();
   if (!cfg) {
     res.statusCode = 200;

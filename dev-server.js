@@ -19,7 +19,6 @@ try {
   }
 } catch (_) {}
 
-const statsHandler = require('./api/stats');
 const dataHandler = require('./api/data');
 const discoverHandler = require('./api/discover');
 const loginHandler = require('./api/login');
@@ -31,9 +30,6 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
-  if (url.pathname === '/api/stats') {
-    return statsHandler(req, res);
-  }
   if (url.pathname === '/api/data') {
     return dataHandler(req, res);
   }

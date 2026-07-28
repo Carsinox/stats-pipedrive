@@ -11,8 +11,12 @@ async function readBody(req) {
   try { return JSON.parse(s || '{}'); } catch (_) { return {}; }
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 module.exports = async (req, res) => {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   if (req.method !== 'POST') { res.statusCode = 405; res.end(JSON.stringify({ ok: false })); return; }
 
   // Aucun mot de passe configuré : accès libre, on considère la connexion réussie.
@@ -25,6 +29,8 @@ module.exports = async (req, res) => {
     res.statusCode = 200;
     res.end(JSON.stringify({ ok: true }));
   } else {
+    // Anti-forçage : ralentit les tentatives automatisées (temporisation sur échec).
+    await sleep(700);
     res.statusCode = 401;
     res.end(JSON.stringify({ ok: false, message: 'Mot de passe incorrect.' }));
   }
