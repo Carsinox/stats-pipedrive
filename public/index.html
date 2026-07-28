@@ -107,9 +107,16 @@
   .objbar .oi{display:flex;flex-direction:column;gap:8px;min-width:0}
   .objbar label{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-secondary)}
   .objrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-  .objrow input{font:inherit;font-size:20px;font-weight:750;width:130px;padding:10px 13px;border-radius:12px;
+  .objrow input{font:inherit;font-size:20px;font-weight:750;width:110px;padding:10px 13px;border-radius:12px;
     border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-variant-numeric:tabular-nums}
-  .objrow input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 28%,transparent)}
+  .objrow input[readonly]{cursor:default;background:var(--surface-2)}
+  .objrow input[readonly]::-webkit-inner-spin-button,.objrow input[readonly]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .objrow .lock{font-size:15px;opacity:.7}
+  .objbtn{font:inherit;font-size:13px;font-weight:650;cursor:pointer;border:1px solid var(--border);
+    background:var(--surface);color:var(--text-secondary);border-radius:10px;padding:9px 14px;transition:border-color .15s,background .15s}
+  .objbtn:hover{border-color:var(--baseline)}
+  .objbtn.primary{background:var(--brand-2);color:#fff;border-color:var(--brand-2)}
+  .objbtn.primary:hover{background:var(--brand-ink)}
   .obj-summary{font-size:13.5px;color:var(--text-secondary);line-height:1.6;max-width:340px}
   .obj-summary .osum-line{display:flex;gap:8px;align-items:baseline}
   .obj-summary b{color:var(--text-primary);font-weight:750;font-variant-numeric:tabular-nums}
@@ -225,7 +232,10 @@
       <div class="oi">
         <label>Objectif mensuel de mandats</label>
         <div class="objrow">
-          <input id="objInput" type="number" min="0" inputmode="numeric" placeholder="ex : 30" />
+          <input id="objInput" type="number" min="0" inputmode="numeric" readonly />
+          <span class="lock" id="objLock" title="Objectif verrouillé">🔒</span>
+          <button class="objbtn" id="objEdit">Modifier l'objectif</button>
+          <button class="objbtn primary" id="objSave" style="display:none">Enregistrer</button>
         </div>
         <div class="obj-summary" id="objSummary"></div>
       </div>
@@ -303,7 +313,7 @@ const escapeHtml=(s)=>String(s==null?'':s).replace(/[&<>"']/g,(c)=>({'&':'&amp;'
 const state = { pipeline:'all', user:'all', gran:'month', month:'', obj:null, raw:null, data:null };
 function monthLabelFr(key){const[y,m]=key.split('-');return new Date(Date.UTC(+y,+m-1,1)).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});}
 const tooltip = $('#tooltip');
-(function(){try{const o=localStorage.getItem('pd_obj');if(o){const n=parseInt(o,10);state.obj=(Number.isFinite(n)&&n>0)?n:null;}}catch(_){}})();
+(function(){let v=15;try{const n=parseInt(localStorage.getItem('pd_obj'),10);if(Number.isFinite(n)&&n>0)v=n;}catch(_){}state.obj=v;})();
 
 const nf = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
 const nf1 = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1});
@@ -581,13 +591,24 @@ $('#ceClose').onclick=()=>$('#ceModal').classList.remove('on');
 $('#ceModal').addEventListener('click',(e)=>{if(e.target.id==='ceModal')$('#ceModal').classList.remove('on');});
 
 // ---------- champ objectif ----------
-$('#objInput').value = state.obj||'';
-$('#objInput').oninput=(e)=>{
-  const v=parseInt(e.target.value,10);
-  state.obj=(Number.isFinite(v)&&v>0)?v:null;
-  try{localStorage.setItem('pd_obj',state.obj||'');}catch(_){}
+const objInput=$('#objInput');
+objInput.value=state.obj;
+function setObjLock(locked){
+  objInput.readOnly=locked;
+  $('#objLock').style.display=locked?'':'none';
+  $('#objEdit').style.display=locked?'':'none';
+  $('#objSave').style.display=locked?'none':'';
+  if(!locked){ objInput.focus(); objInput.select(); }
+}
+$('#objEdit').onclick=()=>setObjLock(false);
+$('#objSave').onclick=()=>{
+  const v=parseInt(objInput.value,10);
+  if(Number.isFinite(v)&&v>0){ state.obj=v; try{localStorage.setItem('pd_obj',String(v));}catch(_){} }
+  objInput.value=state.obj;
+  setObjLock(true);
   if(state.data) render(state.data);
 };
+objInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); $('#objSave').click(); }});
 
 $('#pipelineSel').onchange=(e)=>{state.pipeline=e.target.value;recompute();};
 $('#userSel').onchange=(e)=>{state.user=e.target.value;recompute();};
