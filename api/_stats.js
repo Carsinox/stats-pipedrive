@@ -117,7 +117,10 @@ function ceGroupTimes(cands) {
   const union = (a, b) => { parent[find(a)] = find(b); };
   const keyToNode = new Map();
   cands.forEach((c, i) => {
-    for (const k of [c.pk, c.tk]) {
+    // Déduplication UNIQUEMENT par personne liée (lead <-> affaire du même client).
+    // Pas par titre : les titres sont des modèles de véhicule qui se répètent entre
+    // prospects distincts et provoqueraient de fausses fusions.
+    for (const k of [c.pk]) {
       if (!k) continue;
       if (keyToNode.has(k)) union(i, keyToNode.get(k));
       else keyToNode.set(k, i);

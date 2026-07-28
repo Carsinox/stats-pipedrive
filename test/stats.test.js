@@ -39,33 +39,31 @@ check('séries jour/semaine/mois', () => {
 
 // ---------- CE : union LEADS + AFFAIRES, daté update_time, dédupliqué ----------
 const leads = [
-  { person_id: 1, title: 'Jean Dupont', owner_id: 101, add_time: iso(2026, 7, 3), custom_fields: { cr: 21 } },
-  { person_id: 2, title: 'Marie Curie', owner_id: 101, add_time: iso(2026, 7, 9), custom_fields: { cr: 21 } },
-  { person_id: 3, title: 'Paul Martin', owner_id: 102, add_time: iso(2026, 7, 14), custom_fields: { cr: 21 } },
-  { person_id: 4, title: 'Autre', owner_id: 102, add_time: iso(2026, 7, 10), custom_fields: { cr: 22 } }, // pas CE
-  { person_id: 5, title: 'Ancien', owner_id: 101, add_time: iso(2026, 6, 20), custom_fields: { cr: 21 } }, // mois précédent
+  // Deux prospects DIFFÉRENTS avec le même titre (modèle de véhicule) -> 2 CE distincts.
+  { person_id: 1, title: 'golf 8 r', owner_id: 101, add_time: iso(2026, 7, 3), custom_fields: { cr: 21 } },
+  { person_id: 2, title: 'golf 8 r', owner_id: 101, add_time: iso(2026, 7, 9), custom_fields: { cr: 21 } },
+  { person_id: 3, title: 'a 250 e', owner_id: 102, add_time: iso(2026, 7, 14), custom_fields: { cr: 21 } },
+  { person_id: 4, title: 'x1 20d', owner_id: 102, add_time: iso(2026, 7, 10), custom_fields: { cr: 22 } }, // pas CE
+  { person_id: 5, title: 'ancien', owner_id: 101, add_time: iso(2026, 6, 20), custom_fields: { cr: 21 } }, // mois précédent
 ];
 const dealsCE = [
-  // doublon de Jean Dupont via la même PERSONNE (person_id 1)
-  { id: 10, pipeline_id: 1, status: 'open', person_id: 1, title: 'Jean Dupont', owner_id: 101, add_time: iso(2026, 7, 18), update_time: iso(2026, 7, 20), custom_fields: { cr: 21 } },
-  // CE présent uniquement dans l'affaire
-  { id: 11, pipeline_id: 1, status: 'open', person_id: 99, title: 'Sonia Blanc', owner_id: 103, add_time: iso(2026, 7, 11), update_time: iso(2026, 7, 11), custom_fields: { cr: 21 } },
-  // doublon de Marie Curie via le même TITRE (pas de person_id)
-  { id: 12, pipeline_id: 1, status: 'open', title: 'Marie Curie', owner_id: 101, add_time: iso(2026, 7, 15), update_time: iso(2026, 7, 15), custom_fields: { cr: 21 } },
+  // affaire issue du prospect person_id 1 (même client) -> fusionnée avec le lead 1
+  { id: 10, pipeline_id: 1, status: 'open', person_id: 1, title: 'golf 8 r', owner_id: 101, add_time: iso(2026, 7, 18), update_time: iso(2026, 7, 20), custom_fields: { cr: 21 } },
+  // CE présent uniquement dans une affaire (autre client)
+  { id: 11, pipeline_id: 1, status: 'open', person_id: 99, title: 'a 250 e', owner_id: 103, add_time: iso(2026, 7, 11), update_time: iso(2026, 7, 11), custom_fields: { cr: 21 } },
 ];
 const sc = computeStats({ deals: dealsCE, leads, pipelines }, MAP, { nowMs: NOW, gran: 'month' });
-check('CE = union leads+affaires, dédupliqué (tous)', () => assert.strictEqual(sc.kpis.ce.month, 4)); // JeanDupont, MarieCurie, PaulMartin, SoniaBlanc
+check('CE dédupliqué par PERSONNE (2 mêmes titres = 2 CE distincts)', () => assert.strictEqual(sc.kpis.ce.month, 4)); // p1(+affaire), p2, p3, p99
 const sc101 = computeStats({ deals: dealsCE, leads, pipelines }, MAP, { nowMs: NOW, gran: 'month', ownerId: 101 });
-check('CE filtré commercial 101 (dédup personne + titre)', () => assert.strictEqual(sc101.kpis.ce.month, 2)); // JeanDupont, MarieCurie
+check('CE filtré commercial 101', () => assert.strictEqual(sc101.kpis.ce.month, 2)); // p1(lead+affaire fusionnés), p2
 const sc102 = computeStats({ deals: dealsCE, leads, pipelines }, MAP, { nowMs: NOW, gran: 'month', ownerId: 102 });
-check('CE filtré commercial 102', () => assert.strictEqual(sc102.kpis.ce.month, 1)); // PaulMartin
+check('CE filtré commercial 102', () => assert.strictEqual(sc102.kpis.ce.month, 1)); // p3
 const sc103 = computeStats({ deals: dealsCE, leads, pipelines }, MAP, { nowMs: NOW, gran: 'month', ownerId: 103 });
-check('CE filtré commercial 103 (CE dans affaire seule)', () => assert.strictEqual(sc103.kpis.ce.month, 1)); // SoniaBlanc
+check('CE filtré commercial 103 (CE dans affaire seule)', () => assert.strictEqual(sc103.kpis.ce.month, 1)); // p99
 
-// dédup daté au plus ANCIEN : Jean Dupont (lead 07-03) plutôt que l'affaire (07-20) -> semaine du 03
+// dédup daté au plus ANCIEN : person 1 (lead 07-03) plutôt que l'affaire (07-20)
 const scWeek = computeStats({ deals: dealsCE, leads, pipelines }, MAP, { nowMs: NOW, gran: 'week', ownerId: null });
-check('dédup : total CE sur la fenêtre = 5 (4 juillet + 1 juin)', () => {
-  // 4 groupes en juillet + le lead de juin (dans la fenêtre 12 semaines)
+check('total CE sur la fenêtre = 5 (4 juillet + 1 juin)', () => {
   const total = scWeek.trend.ce.reduce((a, b) => a + b, 0);
   assert.strictEqual(total, 5);
 });

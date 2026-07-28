@@ -86,7 +86,8 @@
     const union = (a, b) => { parent[find(a)] = find(b); };
     const keyToNode = new Map();
     cands.forEach((c, i) => {
-      for (const k of [c.pk, c.tk]) {
+      // Déduplication uniquement par personne liée (pas par titre = modèle de véhicule).
+      for (const k of [c.pk]) {
         if (!k) continue;
         if (keyToNode.has(k)) union(i, keyToNode.get(k));
         else keyToNode.set(k, i);
@@ -206,7 +207,7 @@
     const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
     const union = (a, b) => { parent[find(a)] = find(b); };
     const keyToNode = new Map();
-    cands.forEach((c, i) => { for (const k of [c.pk, c.tk]) { if (!k) continue; if (keyToNode.has(k)) union(i, keyToNode.get(k)); else keyToNode.set(k, i); } });
+    cands.forEach((c, i) => { for (const k of [c.pk]) { if (!k) continue; if (keyToNode.has(k)) union(i, keyToNode.get(k)); else keyToNode.set(k, i); } });
     const groups = new Map();
     cands.forEach((c, i) => {
       const r = find(i);
