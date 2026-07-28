@@ -5,7 +5,7 @@
 const { getConfig, pdGet, pdGetAll, pdGetAllV1 } = require('./_pipedrive');
 const { getMapping, isMapped } = require('./_config');
 const { buildDemo } = require('./_demo');
-const { isAuthed } = require('./_auth');
+const { isAuthed, authRequired } = require('./_auth');
 
 function ownerId(e) {
   const o = e && (e.owner_id !== undefined ? e.owner_id : e.user_id);
@@ -63,9 +63,16 @@ module.exports = async (req, res) => {
     return;
   }
 
-  // Sert une version fraîche 5 min, puis sert instantanément la version en cache
-  // tout en la rafraîchissant en tâche de fond (l'utilisateur n'attend plus).
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
+  // Cache :
+  //  - Site protégé par mot de passe -> cache PRIVÉ (navigateur uniquement). Le CDN partagé
+  //    ne doit jamais stocker ces données, sinon elles pourraient être servies à un visiteur
+  //    non connecté. Le navigateur peut les garder 5 min pour ses propres requêtes.
+  //  - Site ouvert (pas de mot de passe) -> cache CDN partagé + rafraîchissement en tâche de fond.
+  if (authRequired()) {
+    res.setHeader('Cache-Control', 'private, max-age=300');
+  } else {
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=86400');
+  }
 
   const cfg = getConfig();
   const mapping = getMapping();

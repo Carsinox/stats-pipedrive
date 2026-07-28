@@ -200,6 +200,9 @@
     font-size:12px;padding:8px 11px;border-radius:9px;opacity:0;transition:opacity .1s;box-shadow:var(--shadow-lg);white-space:nowrap}
   .tt b{font-weight:700}
 
+  @keyframes vpaspin{to{transform:rotate(360deg)}}
+  #refreshBtn.spinning{animation:vpaspin .8s linear infinite}
+
   /* ---------- Écran de connexion ---------- */
   .login-gate{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;
     background:linear-gradient(140deg,var(--brand-ink),var(--brand-2))}
@@ -611,10 +614,13 @@ function recompute(){
   render(state.data);
 }
 
-// ---------- chargement (cache navigateur + rafraîchissement en tâche de fond) ----------
-const DATA_TTL=10*60*1000; // 10 min
-function readCache(){ try{const r=sessionStorage.getItem('pd_data'),ts=+sessionStorage.getItem('pd_data_ts')||0; if(r&&Date.now()-ts<DATA_TTL) return JSON.parse(r);}catch(_){} return null; }
-function writeCache(d){ try{sessionStorage.setItem('pd_data',JSON.stringify(d));sessionStorage.setItem('pd_data_ts',Date.now());}catch(_){} }
+// ---------- chargement (cache navigateur persistant + rafraîchissement en tâche de fond) ----------
+// On garde le dernier instantané sur l'appareil (localStorage) : à chaque retour, l'affichage est
+// INSTANTANÉ à partir de cet instantané, puis les chiffres se mettent à jour en silence en arrière-plan.
+const DATA_MAXAGE=7*24*60*60*1000; // instantané réutilisable jusqu'à 7 jours
+function readCache(){ try{const r=localStorage.getItem('pd_data'),ts=+localStorage.getItem('pd_data_ts')||0; if(r&&Date.now()-ts<DATA_MAXAGE) return JSON.parse(r);}catch(_){} return null; }
+function writeCache(d){ try{localStorage.setItem('pd_data',JSON.stringify(d));localStorage.setItem('pd_data_ts',String(Date.now()));}catch(_){} }
+function clearCache(){ try{localStorage.removeItem('pd_data');localStorage.removeItem('pd_data_ts');}catch(_){} }
 function fetchData(force){ return fetch('/api/data'+(force?('?fresh='+Date.now()):'')).then(r=>r.json()); }
 
 function applyData(d){
@@ -650,7 +656,11 @@ function applyData(d){
   recompute();
   $('#status').style.display='none';$('#content').style.display='block';
 }
-async function refreshBg(){ try{const d=await fetchData(false); if(d&&d.auth){showGate(true);return;} if(!d.error){writeCache(d);applyData(d);}}catch(_){} }
+async function refreshBg(){
+  const b=$('#refreshBtn'); if(b) b.classList.add('spinning');
+  try{const d=await fetchData(false); if(d&&d.auth){showGate(true);return;} if(!d.error){writeCache(d);applyData(d);}}catch(_){}
+  finally{ if(b) b.classList.remove('spinning'); }
+}
 
 async function load(force){
   // Visite suivante dans la session : affichage instantané depuis le cache, puis MAJ silencieuse.
@@ -768,7 +778,7 @@ $('#loginForm').addEventListener('submit', async (e)=>{
 
 $('#logoutBtn').onclick=async ()=>{
   try{ await fetch('/api/logout',{method:'POST'}); }catch(_){}
-  try{ sessionStorage.removeItem('pd_data'); sessionStorage.removeItem('pd_data_ts'); }catch(_){}
+  clearCache();
   location.reload();
 };
 
