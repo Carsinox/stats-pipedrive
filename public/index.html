@@ -343,7 +343,7 @@
     <div class="grid-2">
       <div class="card">
         <div class="chart-head">
-          <div><h2>Activité dans le temps</h2><p class="hint">CE, affaires créées (R2) et mandats rentrés.</p></div>
+          <div><h2>Objectifs et Mandats</h2><p class="hint">Mandats rentrés vs objectif, dans le temps.</p></div>
           <div class="seg" id="granSeg">
             <button data-g="day">Jour</button>
             <button data-g="week">Semaine</button>
@@ -351,8 +351,6 @@
           </div>
         </div>
         <div class="legend">
-          <span><i class="dot" style="background:var(--s-ce)"></i>CE</span>
-          <span><i class="dot" style="background:var(--s-r2)"></i>Affaires créées</span>
           <span><i class="dot" style="background:var(--s-mandat)"></i>Mandats</span>
           <span id="objLeg" style="display:none"><i class="dot dash" style="background:var(--critical)"></i>Objectif mandats</span>
         </div>
@@ -367,6 +365,13 @@
         </div>
         <div id="finChart"></div>
       </div>
+    </div>
+
+    <!-- Évolution de la note du mois (visible seulement pour un commercial précis) -->
+    <div class="card note-evo" id="noteEvoCard" style="display:none;margin-top:16px">
+      <h2>Évolution de la note du mois <span class="rank-sub" id="noteEvoWho"></span></h2>
+      <p class="hint">Note de performance sur 10, mois par mois (12 derniers mois) — moyenne de la note mandats et de la note remboursements.</p>
+      <div id="noteEvoChart"></div>
     </div>
   </div>
 
@@ -475,6 +480,35 @@ function lineChart(el,labels,series,gran,objLevel){
       let rows=series.map(s=>`<span style="color:${s.color}">●</span> ${s.name} : <b>${nf.format(s.data[i])}</b>`).join('<br>');
       if(objLevel>0) rows+=`<br><span style="color:var(--critical)">┈</span> Objectif mandats : <b>${nf1.format(objLevel)}</b>`;
       showTip(e,`<b>${fmtLabel(labels[i],gran)}</b><br>${rows}`);};
+    r.onmouseleave=()=>{cross.style.opacity='0';hideTip();};
+  });
+}
+
+// ---------- graphique évolution de la note (/10, axe fixe 0-10) ----------
+function noteBand(v){ return v>=8?'var(--good)':v>=6?'var(--brand-2)':v>=4?'#EE9A34':'var(--critical)'; }
+function noteChart(el,labels,notes){
+  const W=580,H=230,padL=28,padR=12,padT=14,padB=26,iw=W-padL-padR,ih=H-padT-padB;
+  const n=labels.length, max=10;
+  const x=(i)=> n<=1?padL+iw/2 : padL+(iw*i)/(n-1);
+  const y=(v)=> padT+ih-(v/max)*ih;
+  let grid='';
+  for(let t=0;t<=5;t++){const val=t*2;const yy=y(val);
+    grid+=`<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="var(--grid)" stroke-width="1"/>`;
+    grid+=`<text x="${padL-6}" y="${yy+3}" text-anchor="end" font-size="10" fill="var(--muted)">${val}</text>`;}
+  let xlab='';const step=Math.ceil(n/8);
+  labels.forEach((k,i)=>{ if(i%step===0||i===n-1){ xlab+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--muted)">${fmtLabel(k,'month')}</text>`; }});
+  const pts=notes.map((o,i)=>`${x(i)},${y(o.note)}`).join(' ');
+  let path=`<polyline points="${pts}" fill="none" stroke="var(--brand-2)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`;
+  let dots='';notes.forEach((o,i)=>{ dots+=`<circle cx="${x(i)}" cy="${y(o.note)}" r="3.4" fill="${noteBand(o.note)}"/>`; });
+  let hit='';labels.forEach((k,i)=>{ const xx=x(i); hit+=`<rect x="${xx-iw/n/2}" y="${padT}" width="${Math.max(6,iw/n)}" height="${ih}" fill="transparent" data-i="${i}"/>`; });
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img">${grid}${xlab}
+    <line id="ncross" x1="0" y1="${padT}" x2="0" y2="${padT+ih}" stroke="var(--baseline)" stroke-width="1" style="opacity:0"/>
+    ${path}${dots}${hit}</svg>`;
+  const cross=el.querySelector('#ncross');
+  el.querySelectorAll('rect[data-i]').forEach(r=>{
+    r.onmousemove=(e)=>{const i=+r.dataset.i;cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.style.opacity='1';
+      const o=notes[i];
+      showTip(e,`<b>${fmtLabel(labels[i],'month')}</b><br><span style="color:${noteBand(o.note)}">●</span> Note : <b>${nf1.format(o.note)}/10</b><br>${nf.format(o.mandats)} mandats · ${nf.format(o.remb)} remb`);};
     r.onmouseleave=()=>{cross.style.opacity='0';hideTip();};
   });
 }
@@ -593,11 +627,18 @@ function render(d){
   $('#mvLabel').textContent=money(d.mandatValue);
   const cs=getComputedStyle(document.body);
   lineChart($('#trendChart'),d.trend.labels,[
-    {name:'CE',color:cs.getPropertyValue('--s-ce'),data:d.trend.ce},
-    {name:'Affaires créées',color:cs.getPropertyValue('--s-r2'),data:d.trend.r2},
     {name:'Mandats',color:cs.getPropertyValue('--s-mandat'),data:d.trend.mandats},
   ],d.gran,objMandatForGran(d.gran));
   barChart($('#finChart'),d.finance.labels,d.finance.ca,d.finance.remboursements,cs.getPropertyValue('--good'),cs.getPropertyValue('--critical'));
+
+  // Évolution de la note du mois : uniquement pour un commercial précis (masquée en « Tout le monde »).
+  const whoNote=state.user!=='all';
+  $('#noteEvoCard').style.display=whoNote?'':'none';
+  if(whoNote){
+    const nt=window.PDStats.noteTrend(state.raw, state.mapping, {nowMs:Date.parse(state.raw.generatedAt)||Date.now(), ownerId:Number(state.user), month: state.month||undefined});
+    $('#noteEvoWho').textContent='· '+((($('#userSel').selectedOptions[0]||{}).textContent)||'');
+    noteChart($('#noteEvoChart'), nt.labels, nt.notes);
+  }
 }
 
 // Recalcule et affiche à partir des données déjà chargées (instantané, sans réseau).

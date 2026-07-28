@@ -302,5 +302,47 @@
     return { mandats: build(M), encaisses: build(E), refMonth };
   }
 
-  window.PDStats = { computeStats, detail, ranking };
+  // Suite de 'n' mois (clés 'YYYY-MM') se terminant au mois 'refMonth' inclus.
+  function monthsEndingAt(refMonth, n) {
+    const parts = String(refMonth).split('-').map(Number);
+    const y = parts[0], m = parts[1]; // m = 1..12
+    const out = [];
+    for (let i = n - 1; i >= 0; i--) out.push(monthKey(new Date(Date.UTC(y, m - 1 - i, 1))));
+    return out;
+  }
+
+  // Historique de la NOTE du mois (/10) sur 12 mois, pour un commercial donné.
+  // Note = moyenne de :
+  //   - note mandats  = min(10, mandats × 10/15)        (15 mandats = 10/10)
+  //   - note remb     = max(0, (100 − remb/mandats×100) / 10)
+  //   - 0 mandat      => note globale 0/10
+  function noteTrend(data, mapping, opts) {
+    const deals = data.deals || [];
+    const nowMs = opts.nowMs;
+    const ownerId = opts.ownerId ? Number(opts.ownerId) : null;
+    const pipeFilter = (mapping.pipelines && mapping.pipelines.length) ? new Set(mapping.pipelines.map(Number)) : null;
+    const inScope = (d) => !pipeFilter || pipeFilter.has(Number(d.pipeline_id));
+    const ownedBy = (e) => !ownerId || ownerOf(e) === ownerId;
+    const dScoped = deals.filter((d) => d.status !== 'deleted' && inScope(d) && ownedBy(d));
+
+    const refMonth = opts.month || monthKey(new Date(nowMs));
+    const labels = monthsEndingAt(refMonth, 12);
+    const mand = new Map(labels.map((m) => [m, 0]));
+    const remb = new Map(labels.map((m) => [m, 0]));
+    for (const d of dScoped) {
+      const md = parseTs(getCF(d, mapping.mandatDateField));
+      if (md) { const k = monthKey(md); if (mand.has(k)) mand.set(k, mand.get(k) + 1); }
+      if (d.status === 'lost' && md) { const lt = parseTs(d.lost_time); if (lt) { const k = monthKey(lt); if (remb.has(k)) remb.set(k, remb.get(k) + 1); } }
+    }
+    const notes = labels.map((m) => {
+      const mandats = mand.get(m), r = remb.get(m);
+      const nMand = Math.min(10, mandats * 10 / 15);
+      if (mandats <= 0) return { note: 0, mandats: 0, remb: r };
+      const nRemb = Math.max(0, (100 - r / mandats * 100) / 10);
+      return { note: Math.round((nMand + nRemb) / 2 * 10) / 10, mandats, remb: r };
+    });
+    return { labels, notes };
+  }
+
+  window.PDStats = { computeStats, detail, ranking, noteTrend };
 })();
