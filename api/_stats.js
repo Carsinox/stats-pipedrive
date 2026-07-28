@@ -183,33 +183,32 @@ function computeStats({ deals = [], activities = [], persons = [], leads = [], p
   const mandatDeals = dScoped.filter((d) => parseTs(getCF(d, mapping.mandatDateField)));
   const mandatEvents = mandatDeals.map((d) => parseTs(getCF(d, mapping.mandatDateField)));
 
-  // ----- Agrégats période courante (jour/semaine/mois) -----
-  const per = (events) => ({
-    day: countInCurrent(events, nowMs, 'day'),
-    week: countInCurrent(events, nowMs, 'week'),
-    month: countInCurrent(events, nowMs, 'month'),
-  });
+  // ----- Agrégats : mois courant (jour/semaine/mois) OU mois sélectionné -----
+  const curMonth = monthKey(new Date(nowMs));
+  const refMonth = opts.month || curMonth;
+  const monthMode = !!opts.month;
+  const cntMonth = (events, mk) => { let n = 0; for (const ts of events) if (ts && monthKey(ts) === mk) n++; return n; };
+  const per = (events) => monthMode
+    ? { day: null, week: null, month: cntMonth(events, refMonth) }
+    : { day: countInCurrent(events, nowMs, 'day'), week: countInCurrent(events, nowMs, 'week'), month: cntMonth(events, curMonth) };
   const ce = per(ceEvents);
   const r2 = per(r2Events);
   const mandats = per(mandatEvents);
 
-  // ----- Taux de transfo du mois -----
   const tauxTransfo = ce.month > 0 ? mandats.month / ce.month : null;
 
-  // ----- CA gagné du mois (affaires facturées) -----
-  const curMonth = monthKey(new Date(nowMs));
   const wonThisMonth = dScoped.filter((d) => d.status === 'won' && (() => {
-    const wt = parseTs(d.won_time); return wt && monthKey(wt) === curMonth;
+    const wt = parseTs(d.won_time); return wt && monthKey(wt) === refMonth;
   })());
   const caGagneMonth = wonThisMonth.length * mv;
 
-  // ----- Potentiel à venir : affaires en cours avec date de règlement mandat -----
-  const potentielDeals = mandatDeals.filter((d) => d.status === 'open');
+  const potentielDeals = monthMode
+    ? mandatDeals.filter((d) => d.status === 'open' && monthKey(parseTs(getCF(d, mapping.mandatDateField))) === refMonth)
+    : mandatDeals.filter((d) => d.status === 'open');
   const potentiel = potentielDeals.length * mv;
 
-  // ----- Remboursements du mois : affaires perdues avec date règlement mandat -----
   const rembMonthDeals = mandatDeals.filter((d) => d.status === 'lost' && (() => {
-    const lt = parseTs(d.lost_time); return lt && monthKey(lt) === curMonth;
+    const lt = parseTs(d.lost_time); return lt && monthKey(lt) === refMonth;
   })());
   const remboursementsMonth = rembMonthDeals.length * mv;
 
@@ -248,7 +247,7 @@ function computeStats({ deals = [], activities = [], persons = [], leads = [], p
 
   return {
     mandatValue: mv,
-    gran,
+    gran, monthMode, refMonth,
     pipelines: pipeList,
     kpis: {
       ce, r2, mandats,

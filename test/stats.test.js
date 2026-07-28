@@ -30,6 +30,12 @@ const s1 = computeStats({ deals, pipelines }, { ...MAP, pipelines: [1] }, { nowM
 check('filtre pipeline 1 : CA', () => assert.strictEqual(s1.kpis.caGagneMonth, 1 * 500));
 check('filtre pipeline 1 : mandats', () => assert.strictEqual(s1.kpis.mandats.month, 4));
 
+// ----- sélecteur de mois -----
+const sJune = computeStats({ deals, pipelines }, MAP, { nowMs: NOW, gran: 'month', month: '2026-06' });
+check('mois sélectionné : R2 de juin (d5 créé en juin)', () => assert.strictEqual(sJune.kpis.r2.month, 1));
+check('mois sélectionné : jour/semaine null (valeur mensuelle seule)', () => assert.strictEqual(sJune.kpis.ce.day, null));
+check('mois sélectionné : monthMode=true', () => assert.strictEqual(sJune.monthMode, true));
+
 check('séries jour/semaine/mois', () => {
   assert.strictEqual(computeStats({ deals, pipelines }, MAP, { nowMs: NOW, gran: 'day' }).trend.labels.length, 30);
   assert.strictEqual(computeStats({ deals, pipelines }, MAP, { nowMs: NOW, gran: 'week' }).trend.labels.length, 12);

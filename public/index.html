@@ -93,6 +93,8 @@
   .tile.single .value{font-size:31px;font-weight:760;margin-top:10px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
   .tile.single .foot{font-size:12.5px;color:var(--muted);margin-top:4px}
   .accent-good .value{color:var(--good-ink)} .accent-crit .value{color:var(--critical)}
+  .tile .bigval{font-size:30px;font-weight:760;margin-top:12px;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--brand-2)}
+  .tile .subfoot{font-size:12px;color:var(--muted);margin-top:4px;text-transform:capitalize}
   .tile.clickable{cursor:pointer;transition:transform .12s,box-shadow .15s,border-color .15s}
   .tile.clickable:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:color-mix(in srgb,var(--s-ce) 40%,var(--border))}
   .tile .look{position:absolute;top:14px;right:16px;font-size:11.5px;font-weight:600;color:var(--brand-2);opacity:.85}
@@ -207,6 +209,7 @@
 </header>
 <div class="wrap">
   <div class="controls">
+    <select id="monthSel" title="Période"><option value="">Mois en cours (J/S/M)</option></select>
     <select id="userSel" title="Commercial"><option value="all">Tous les commerciaux</option></select>
     <select id="pipelineSel" title="Pipeline"><option value="all">Tous les pipelines</option></select>
   </div>
@@ -292,7 +295,8 @@
 <script>
 const $ = (s)=>document.querySelector(s);
 const escapeHtml=(s)=>String(s==null?'':s).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const state = { pipeline:'all', user:'all', gran:'month', obj:null, raw:null, data:null };
+const state = { pipeline:'all', user:'all', gran:'month', month:'', obj:null, raw:null, data:null };
+function monthLabelFr(key){const[y,m]=key.split('-');return new Date(Date.UTC(+y,+m-1,1)).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});}
 const tooltip = $('#tooltip');
 (function(){try{const o=localStorage.getItem('pd_obj');if(o){const n=parseInt(o,10);state.obj=(Number.isFinite(n)&&n>0)?n:null;}}catch(_){}})();
 
@@ -390,7 +394,10 @@ function barChart(el,labels,a,b,colA,colB){
 function addLook(id){ const el=$(id); if(!el)return; el.classList.add('clickable'); el.insertAdjacentHTML('beforeend','<span class="look">détail ›</span>'); }
 // Objectif CE selon la granularité (10% de transfo) : jour = M, semaine = M×5, mois = M×10.
 function objCEForGran(gran){ const M=state.obj; if(!M||M<=0) return 0; return gran==='day'?M:gran==='week'?M*5:M*10; }
-function renderBattery(mandatsMonth){
+function monthTile(el,title,color,value,sub){
+  el.innerHTML=`<div class="label"><i class="chip" style="background:${color}"></i>${title}</div><div class="bigval">${nf.format(value)}</div><div class="subfoot">${sub}</div>`;
+}
+function renderBattery(mandatsMonth,monthLbl){
   const M=state.obj;
   const ratio=(M&&M>0)?mandatsMonth/M:0;
   const filled=Math.max(0,Math.min(10,Math.round(ratio*10)));
@@ -400,7 +407,7 @@ function renderBattery(mandatsMonth){
   const pctEl=$('#battPct'), hint=$('#objHint'), leg=$('#objLeg');
   if(M&&M>0){
     pctEl.textContent=Math.round(ratio*100)+'%'; pctEl.style.color=color;
-    hint.innerHTML=`≈ <b>${nf.format(M)} CE/jour</b> visés (à 10 % de transfo) · ${nf.format(mandatsMonth)}/${nf.format(M)} mandats ce mois`;
+    hint.innerHTML=`≈ <b>${nf.format(M)} CE/jour</b> visés (à 10 % de transfo) · ${nf.format(mandatsMonth)}/${nf.format(M)} mandats (${monthLbl||'ce mois'})`;
     if(leg) leg.style.display='';
   } else {
     pctEl.textContent='—'; pctEl.style.color='var(--muted)';
@@ -409,19 +416,25 @@ function renderBattery(mandatsMonth){
   }
 }
 function render(d){
-  const k=d.kpis;
-  actTile($('#tileCE'),'CE — Contacts établis','var(--s-ce)',k.ce);
-  actTile($('#tileR2'),'R2 — Affaires créées','var(--s-r2)',k.r2);
-  actTile($('#tileMandat'),'Mandats rentrés','var(--s-mandat)',k.mandats);
-  singleTile($('#tileTaux'),'Taux de transformation (mois)',pct(k.tauxTransfo),
+  const k=d.kpis, mm=d.monthMode, ml=mm?monthLabelFr(d.refMonth):'mois';
+  if(mm){
+    monthTile($('#tileCE'),'CE — Contacts établis','var(--s-ce)',k.ce.month,ml);
+    monthTile($('#tileR2'),'R2 — Affaires créées','var(--s-r2)',k.r2.month,ml);
+    monthTile($('#tileMandat'),'Mandats rentrés','var(--s-mandat)',k.mandats.month,ml);
+  } else {
+    actTile($('#tileCE'),'CE — Contacts établis','var(--s-ce)',k.ce);
+    actTile($('#tileR2'),'R2 — Affaires créées','var(--s-r2)',k.r2);
+    actTile($('#tileMandat'),'Mandats rentrés','var(--s-mandat)',k.mandats);
+  }
+  singleTile($('#tileTaux'),`Taux de transformation (${ml})`,pct(k.tauxTransfo),
     `${nf.format(k.mandats.month)} mandats / ${nf.format(k.ce.month)} CE`);
 
-  singleTile($('#tileCA'),'Revenus générés (mois)',money(k.caGagneMonth),`${nf.format(k.wonCountMonth)} dossiers facturés × ${money(d.mandatValue)}`);
-  singleTile($('#tilePot'),'Potentiel revenu',money(k.potentiel),`${nf.format(k.potentielCount)} mandats en cours`);
-  singleTile($('#tileRemb'),'Dossiers remboursés (mois)',money(k.remboursementsMonth),`${nf.format(k.remboursementsCount)} dossiers remboursés`);
+  singleTile($('#tileCA'),`Revenus générés (${ml})`,money(k.caGagneMonth),`${nf.format(k.wonCountMonth)} dossiers facturés × ${money(d.mandatValue)}`);
+  singleTile($('#tilePot'),mm?`Potentiel revenu (${ml})`:'Potentiel revenu',money(k.potentiel),`${nf.format(k.potentielCount)} mandats ${mm?'signés ce mois':'en cours'}`);
+  singleTile($('#tileRemb'),`Dossiers remboursés (${ml})`,money(k.remboursementsMonth),`${nf.format(k.remboursementsCount)} dossiers remboursés`);
 
   ['#tileCE','#tileR2','#tileMandat','#tileCA','#tilePot','#tileRemb'].forEach(addLook);
-  renderBattery(k.mandats.month);
+  renderBattery(k.mandats.month, mm?ml:null);
 
   $('#mvLabel').textContent=money(d.mandatValue);
   const cs=getComputedStyle(document.body);
@@ -441,7 +454,7 @@ function recompute(){
   state.mapping=mapping;
   const nowMs=Date.parse(raw.generatedAt)||Date.now();
   const ownerId=state.user==='all'?null:Number(state.user);
-  const stats=window.PDStats.computeStats(raw, mapping, {nowMs, gran:state.gran, ownerId});
+  const stats=window.PDStats.computeStats(raw, mapping, {nowMs, gran:state.gran, ownerId, month:state.month||undefined});
   state.data={...stats, demo:raw.demo, generatedAt:raw.generatedAt};
   render(state.data);
 }
@@ -463,6 +476,16 @@ function applyData(d){
   if(usel.dataset.filled!=='1'&&d.users&&d.users.length){
     d.users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.name;usel.appendChild(o);});
     usel.dataset.filled='1';usel.value=state.user;
+  }
+  const msel=$('#monthSel');
+  if(msel.dataset.filled!=='1'){
+    const now=new Date(Date.parse(d.generatedAt)||Date.now());
+    for(let i=0;i<12;i++){
+      const dt=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()-i,1));
+      const key=`${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}`;
+      const o=document.createElement('option');o.value=key;o.textContent=monthLabelFr(key);msel.appendChild(o);
+    }
+    msel.dataset.filled='1';msel.value=state.month;
   }
   $('#demoBadge').style.display=d.demo?'inline-block':'none';
   const when=new Date(d.generatedAt).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
@@ -512,10 +535,11 @@ function openDetail(kind){
   const nowMs=Date.parse(state.raw.generatedAt)||Date.now();
   const ownerId=state.user==='all'?null:Number(state.user);
   const period=DETAIL[kind].period();
-  const list=window.PDStats.detail(kind,state.raw,state.mapping,{nowMs,ownerId,period});
+  const list=window.PDStats.detail(kind,state.raw,state.mapping,{nowMs,ownerId,period,month:state.month||undefined});
   const uname=state.user==='all'?'tous les commerciaux':(($('#userSel').selectedOptions[0]||{}).textContent||'');
+  const plabel=state.month?monthLabelFr(state.month):periodLabel(period);
   $('#ceTitle').textContent='Détail · '+DETAIL[kind].label;
-  $('#ceSub').textContent=`${nf.format(list.length)} · ${periodLabel(period)} · ${uname}`;
+  $('#ceSub').textContent=`${nf.format(list.length)} · ${plabel} · ${uname}`;
   const body=$('#ceBody');
   if(!list.length){body.innerHTML='<div class="empty">Aucun élément sur cette période avec les filtres actuels.</div>';}
   else{
@@ -547,6 +571,7 @@ $('#objInput').oninput=(e)=>{
 
 $('#pipelineSel').onchange=(e)=>{state.pipeline=e.target.value;recompute();};
 $('#userSel').onchange=(e)=>{state.user=e.target.value;recompute();};
+$('#monthSel').onchange=(e)=>{state.month=e.target.value;recompute();};
 $('#refreshBtn').onclick=()=>load(true);
 $('#granSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   state.gran=b.dataset.g;$('#granSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));recompute();

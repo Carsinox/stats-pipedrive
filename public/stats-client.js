@@ -144,16 +144,24 @@
     const mandatDeals = dScoped.filter((d) => parseTs(getCF(d, mapping.mandatDateField)));
     const mandatEvents = mandatDeals.map((d) => parseTs(getCF(d, mapping.mandatDateField)));
 
-    const per = (events) => ({ day: countInCurrent(events, nowMs, 'day'), week: countInCurrent(events, nowMs, 'week'), month: countInCurrent(events, nowMs, 'month') });
+    // Mois de référence : soit le mois choisi dans le filtre (opts.month), soit le mois courant.
+    const curMonth = monthKey(new Date(nowMs));
+    const refMonth = opts.month || curMonth;
+    const monthMode = !!opts.month;
+    const cntMonth = (events, mk) => { let n = 0; for (const ts of events) if (ts && monthKey(ts) === mk) n++; return n; };
+    const per = (events) => monthMode
+      ? { day: null, week: null, month: cntMonth(events, refMonth) }
+      : { day: countInCurrent(events, nowMs, 'day'), week: countInCurrent(events, nowMs, 'week'), month: cntMonth(events, curMonth) };
     const ce = per(ceEvents), r2 = per(r2Events), mandats = per(mandatEvents);
     const tauxTransfo = ce.month > 0 ? mandats.month / ce.month : null;
 
-    const curMonth = monthKey(new Date(nowMs));
-    const wonThisMonth = dScoped.filter((d) => { if (d.status !== 'won') return false; const wt = parseTs(d.won_time); return wt && monthKey(wt) === curMonth; });
+    const wonThisMonth = dScoped.filter((d) => { if (d.status !== 'won') return false; const wt = parseTs(d.won_time); return wt && monthKey(wt) === refMonth; });
     const caGagneMonth = wonThisMonth.length * mv;
-    const potentielDeals = mandatDeals.filter((d) => d.status === 'open');
+    const potentielDeals = monthMode
+      ? mandatDeals.filter((d) => d.status === 'open' && monthKey(parseTs(getCF(d, mapping.mandatDateField))) === refMonth)
+      : mandatDeals.filter((d) => d.status === 'open');
     const potentiel = potentielDeals.length * mv;
-    const rembMonthDeals = mandatDeals.filter((d) => { if (d.status !== 'lost') return false; const lt = parseTs(d.lost_time); return lt && monthKey(lt) === curMonth; });
+    const rembMonthDeals = mandatDeals.filter((d) => { if (d.status !== 'lost') return false; const lt = parseTs(d.lost_time); return lt && monthKey(lt) === refMonth; });
     const remboursementsMonth = rembMonthDeals.length * mv;
 
     const trend = {
@@ -173,7 +181,7 @@
     const finance = { labels: months, ca: months.map((m) => caByMonth.get(m)), remboursements: months.map((m) => rembByMonth.get(m)) };
 
     return {
-      mandatValue: mv, gran,
+      mandatValue: mv, gran, monthMode, refMonth,
       kpis: { ce, r2, mandats, tauxTransfo, caGagneMonth, wonCountMonth: wonThisMonth.length, potentiel, potentielCount: potentielDeals.length, remboursementsMonth, remboursementsCount: rembMonthDeals.length },
       trend, finance,
     };
@@ -218,10 +226,11 @@
       if (c.src === 'deal') g.inDeal = true;
     });
     const wantKey = keyOf(new Date(nowMs), gran);
+    const inSel = (t) => opts.month ? monthKey(new Date(t)) === opts.month : keyOf(new Date(t), gran) === wantKey;
     const out = [];
     for (const g of groups.values()) {
       const t = g.stampedMin !== undefined ? g.stampedMin : g.anyMin;
-      if (keyOf(new Date(t), gran) === wantKey) out.push({ date: t, stamped: g.stampedMin !== undefined, title: g.title, inLead: g.inLead, inDeal: g.inDeal });
+      if (inSel(t)) out.push({ date: t, stamped: g.stampedMin !== undefined, title: g.title, inLead: g.inLead, inDeal: g.inDeal });
     }
     out.sort((a, b) => b.date - a.date);
     return out;
@@ -238,16 +247,17 @@
     const ownedBy = (e) => !ownerId || ownerOf(e) === ownerId;
     const dScoped = deals.filter((d) => d.status !== 'deleted' && inScope(d) && ownedBy(d));
     const curKey = gran === 'all' ? null : keyOf(new Date(nowMs), gran);
-    const inBucket = (ms) => ms != null && (gran === 'all' || keyOf(new Date(ms), gran) === curKey);
-    const curMonth = monthKey(new Date(nowMs));
-    const inMonth = (ms) => ms != null && monthKey(new Date(ms)) === curMonth;
+    // Si un mois est sélectionné (opts.month), tout est filtré sur ce mois.
+    const inBucket = (ms) => ms != null && (opts.month ? monthKey(new Date(ms)) === opts.month : (gran === 'all' || keyOf(new Date(ms), gran) === curKey));
+    const refMonth = opts.month || monthKey(new Date(nowMs));
+    const inMonth = (ms) => ms != null && monthKey(new Date(ms)) === refMonth;
     const rows = [];
     for (const d of dScoped) {
       const title = d.title || '(sans nom)';
       if (kind === 'r2') { const t = parseTs(d.add_time); if (t && inBucket(t.getTime())) rows.push({ date: t.getTime(), title }); }
       else if (kind === 'mandat') { const t = parseTs(getCF(d, mapping.mandatDateField)); if (t && inBucket(t.getTime())) rows.push({ date: t.getTime(), title }); }
       else if (kind === 'ca') { if (d.status !== 'won') continue; const t = parseTs(d.won_time); if (t && inMonth(t.getTime())) rows.push({ date: t.getTime(), title }); }
-      else if (kind === 'potentiel') { if (d.status !== 'open') continue; const t = parseTs(getCF(d, mapping.mandatDateField)); if (t) rows.push({ date: t.getTime(), title }); }
+      else if (kind === 'potentiel') { if (d.status !== 'open') continue; const t = parseTs(getCF(d, mapping.mandatDateField)); if (t && (!opts.month || inMonth(t.getTime()))) rows.push({ date: t.getTime(), title }); }
       else if (kind === 'remboursement') { if (d.status !== 'lost') continue; if (!parseTs(getCF(d, mapping.mandatDateField))) continue; const t = parseTs(d.lost_time); if (t && inMonth(t.getTime())) rows.push({ date: t.getTime(), title }); }
     }
     rows.sort((a, b) => b.date - a.date);
