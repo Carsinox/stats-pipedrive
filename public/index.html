@@ -75,7 +75,7 @@
   /* ---------- Cartes ---------- */
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
   .grid-act{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
-  .grid-fin{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+  .grid-fin{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
   .grid-2{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
 
   .tile{position:relative;overflow:hidden}
@@ -171,12 +171,11 @@
 
   /* ---------- Responsive ---------- */
   @media (max-width:920px){ .grid-2{grid-template-columns:1fr} }
-  @media (max-width:920px){ .grid-fin{grid-template-columns:repeat(2,1fr)} }
   @media (max-width:720px){
     .grid-act{grid-template-columns:repeat(2,1fr)}
+    .grid-fin{grid-template-columns:1fr}
     .brand-title{font-size:15px}
   }
-  @media (max-width:420px){ .grid-fin{grid-template-columns:1fr} }
   @media (max-width:560px){
     .wrap{padding:14px 13px 56px}
     .appbar-inner{padding:11px 13px;gap:10px}
@@ -247,7 +246,6 @@
 
     <!-- Finance -->
     <div class="grid-fin">
-      <div class="card tile single" id="tileRevTot"></div>
       <div class="card tile single accent-good" id="tileCA"></div>
       <div class="card tile single" id="tilePot"></div>
       <div class="card tile single accent-crit" id="tileRemb"></div>
@@ -447,12 +445,11 @@ function render(d){
   singleTile($('#tileTaux'),`Taux de transformation (${ml})`,pct(k.tauxTransfo),
     `${nf.format(k.mandats.month)} mandats / ${nf.format(k.ce.month)} CE`);
 
-  singleTile($('#tileRevTot'),`Revenus totaux (${ml})`,money(k.revenusTotaux),`${nf.format(k.revTotCount)} mandats du mois · gagnés + en cours + perdus`);
   singleTile($('#tileCA'),`Revenus encaissés (${ml})`,money(k.caGagneMonth),`${nf.format(k.wonCountMonth)} dossiers gagnés`);
   singleTile($('#tilePot'),'Potentiel revenu',money(k.potentiel),`${nf.format(k.potentielCount)} mandats en cours`);
   singleTile($('#tileRemb'),`Dossiers remboursés (${ml})`,money(k.remboursementsMonth),`${nf.format(k.remboursementsCount)} dossiers remboursés`);
 
-  ['#tileCE','#tileR2','#tileMandat','#tileRevTot','#tileCA','#tilePot','#tileRemb'].forEach(addLook);
+  ['#tileCE','#tileR2','#tileMandat','#tileCA','#tilePot','#tileRemb'].forEach(addLook);
   renderBattery(k.mandats.month, mm?ml:null, k.tauxTransfo);
 
   $('#mvLabel').textContent=money(d.mandatValue);
@@ -544,7 +541,6 @@ const DETAIL={
   ce:{label:'CE — Contacts établis',period:()=>state.gran},
   r2:{label:'R2 — Affaires créées',period:()=>state.gran},
   mandat:{label:'Mandats rentrés',period:()=>state.gran},
-  revtot:{label:'Revenus totaux',period:()=>'month'},
   ca:{label:'Revenus encaissés',period:()=>'month'},
   potentiel:{label:'Potentiel revenu',period:()=>'all'},
   remboursement:{label:'Dossiers remboursés',period:()=>'month'},
@@ -578,7 +574,7 @@ function openDetail(kind){
   }
   $('#ceModal').classList.add('on');
 }
-[['tileCE','ce'],['tileR2','r2'],['tileMandat','mandat'],['tileRevTot','revtot'],['tileCA','ca'],['tilePot','potentiel'],['tileRemb','remboursement']].forEach(([id,kind])=>{
+[['tileCE','ce'],['tileR2','r2'],['tileMandat','mandat'],['tileCA','ca'],['tilePot','potentiel'],['tileRemb','remboursement']].forEach(([id,kind])=>{
   const el=document.getElementById(id); if(el) el.addEventListener('click',()=>openDetail(kind));
 });
 $('#ceClose').onclick=()=>$('#ceModal').classList.remove('on');
