@@ -122,6 +122,13 @@
   .obj-summary b{color:var(--text-primary);font-weight:750;font-variant-numeric:tabular-nums}
   .obj-summary .osum-note{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.45}
   .obj-summary .osum-empty{color:var(--muted)}
+  .perf-batt{display:flex;align-items:center;gap:16px;flex:none}
+  .perf-note{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:78px}
+  .pn-ring{display:block}
+  .pn-num{font-size:18px;font-weight:850;font-variant-numeric:tabular-nums}
+  .pn-den{font-size:8.5px;fill:var(--muted);font-weight:700}
+  .pn-cap{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:800;color:var(--text-secondary)}
+  .pn-detail{font-size:10px;color:var(--muted);text-align:center;line-height:1.35;max-width:150px}
   .batt-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;flex:none}
   .battery{display:flex;align-items:center;gap:3px;padding:5px 6px;border:2px solid var(--baseline);border-radius:9px;background:var(--surface)}
   .battery .cell{width:9px;height:28px;border-radius:2px;background:var(--grid);transition:background .3s}
@@ -256,10 +263,13 @@
         </div>
         <div class="obj-summary" id="objSummary"></div>
       </div>
-      <div class="batt-wrap">
-        <div class="battery" id="battery" title="Progression vers l'objectif de mandats du mois"></div>
-        <div class="batt-cap">objectif</div>
-        <div class="batt-pct" id="battPct"></div>
+      <div class="perf-batt">
+        <div class="perf-note" id="perfNote" style="display:none"></div>
+        <div class="batt-wrap">
+          <div class="battery" id="battery" title="Progression vers l'objectif de mandats du mois"></div>
+          <div class="batt-cap">objectif</div>
+          <div class="batt-pct" id="battPct"></div>
+        </div>
       </div>
     </div>
 
@@ -473,6 +483,29 @@ function renderBattery(mandatsMonth,monthLbl,transfo){
     if(leg) leg.style.display='none';
   }
 }
+function renderPerfNote(mandats, remb, show){
+  const el=$('#perfNote');
+  if(!show){ el.style.display='none'; return; }
+  el.style.display='';
+  const nMand=Math.min(10, mandats*10/15);   // 15 mandats = 10/10
+  let nRemb, note;
+  if(mandats<=0){ nRemb=0; note=0; }          // 0 mandat -> note globale 0/10
+  else { const p=remb/mandats*100; nRemb=Math.max(0,(100-p)/10); note=(nMand+nRemb)/2; }
+  const r=Math.round(note*10)/10;
+  const color = note>=8?'var(--good)' : note>=6?'var(--brand-2)' : note>=4?'#EE9A34' : 'var(--critical)';
+  const C=2*Math.PI*26, dash=(Math.max(0,Math.min(1,note/10))*C).toFixed(1);
+  const pTxt = mandats>0 ? nf1.format(remb/mandats*100)+' %' : '—';
+  el.title=`Note du mois = moyenne de 2 notes\n• Mandats : ${nf1.format(nMand)}/10 (${nf.format(mandats)} mandats, cible 15 = 10/10)\n• Remboursements : ${nf1.format(nRemb)}/10 (${nf.format(remb)} remb / ${nf.format(mandats)} mandats = ${pTxt})`;
+  el.innerHTML=
+    `<svg viewBox="0 0 64 64" width="70" height="70" class="pn-ring">`+
+      `<circle cx="32" cy="32" r="26" fill="none" stroke="var(--grid)" stroke-width="7"/>`+
+      `<circle cx="32" cy="32" r="26" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${dash} ${C.toFixed(1)}" transform="rotate(-90 32 32)"/>`+
+      `<text x="32" y="31" text-anchor="middle" class="pn-num" fill="${color}">${nf1.format(r)}</text>`+
+      `<text x="32" y="43" text-anchor="middle" class="pn-den">/10</text>`+
+    `</svg>`+
+    `<div class="pn-cap">Note du mois</div>`+
+    `<div class="pn-detail">📈 Mandats ${nf1.format(nMand)}/10 · 💸 Remb ${nf1.format(nRemb)}/10</div>`;
+}
 function renderRanking(rk,periodLbl){
   $('#rankPeriod').textContent='· '+periodLbl;
   const me=state.user==='all'?null:Number(state.user);
@@ -501,6 +534,7 @@ function render(d){
 
   ['#tileCE','#tileR2','#tileMandat','#tileCA','#tilePot','#tileRemb'].forEach(addLook);
   renderBattery(k.mandats.month, mm?ml:null, k.tauxTransfo);
+  renderPerfNote(k.mandats.month, k.remboursementsCount, state.user!=='all');
 
   const rk=window.PDStats.ranking(state.raw, state.mapping, {nowMs:Date.parse(state.raw.generatedAt)||Date.now(), month: state.month||undefined});
   renderRanking(rk, mm?ml:'mois en cours');
