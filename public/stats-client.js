@@ -155,14 +155,22 @@
     const ce = per(ceEvents), r2 = per(r2Events), mandats = per(mandatEvents);
     const tauxTransfo = ce.month > 0 ? mandats.month / ce.month : null;
 
+    // Valeur d'un dossier : 250 € si le titre contient "ghost", sinon la valeur de mandat (500 €).
+    const dealValue = (d) => /ghost/i.test(d.title || '') ? 250 : mv;
+    const sumV = (arr) => arr.reduce((t, d) => t + dealValue(d), 0);
+
+    // Revenus TOTAUX : tous les mandats du mois (date de règlement mandat dans le mois), quel que soit le statut.
+    const revTotDeals = mandatDeals.filter((d) => monthKey(parseTs(getCF(d, mapping.mandatDateField))) === refMonth);
+    const revenusTotaux = sumV(revTotDeals);
+    // Revenus encaissés : affaires gagnées du mois.
     const wonThisMonth = dScoped.filter((d) => { if (d.status !== 'won') return false; const wt = parseTs(d.won_time); return wt && monthKey(wt) === refMonth; });
-    const caGagneMonth = wonThisMonth.length * mv;
-    const potentielDeals = monthMode
-      ? mandatDeals.filter((d) => d.status === 'open' && monthKey(parseTs(getCF(d, mapping.mandatDateField))) === refMonth)
-      : mandatDeals.filter((d) => d.status === 'open');
-    const potentiel = potentielDeals.length * mv;
+    const caGagneMonth = sumV(wonThisMonth);
+    // Potentiel : affaires EN COURS avec date de règlement mandat (peu importe la date).
+    const potentielDeals = mandatDeals.filter((d) => d.status === 'open');
+    const potentiel = sumV(potentielDeals);
+    // Remboursements du mois : affaires perdues avec date de règlement mandat, perdues ce mois.
     const rembMonthDeals = mandatDeals.filter((d) => { if (d.status !== 'lost') return false; const lt = parseTs(d.lost_time); return lt && monthKey(lt) === refMonth; });
-    const remboursementsMonth = rembMonthDeals.length * mv;
+    const remboursementsMonth = sumV(rembMonthDeals);
 
     const trend = {
       labels: buildRange(nowMs, gran),
@@ -175,14 +183,14 @@
     const caByMonth = new Map(months.map((m) => [m, 0]));
     const rembByMonth = new Map(months.map((m) => [m, 0]));
     dScoped.forEach((d) => {
-      if (d.status === 'won') { const wt = parseTs(d.won_time); if (wt && caByMonth.has(monthKey(wt))) caByMonth.set(monthKey(wt), caByMonth.get(monthKey(wt)) + mv); }
-      if (d.status === 'lost' && parseTs(getCF(d, mapping.mandatDateField))) { const lt = parseTs(d.lost_time); if (lt && rembByMonth.has(monthKey(lt))) rembByMonth.set(monthKey(lt), rembByMonth.get(monthKey(lt)) + mv); }
+      if (d.status === 'won') { const wt = parseTs(d.won_time); if (wt && caByMonth.has(monthKey(wt))) caByMonth.set(monthKey(wt), caByMonth.get(monthKey(wt)) + dealValue(d)); }
+      if (d.status === 'lost' && parseTs(getCF(d, mapping.mandatDateField))) { const lt = parseTs(d.lost_time); if (lt && rembByMonth.has(monthKey(lt))) rembByMonth.set(monthKey(lt), rembByMonth.get(monthKey(lt)) + dealValue(d)); }
     });
     const finance = { labels: months, ca: months.map((m) => caByMonth.get(m)), remboursements: months.map((m) => rembByMonth.get(m)) };
 
     return {
       mandatValue: mv, gran, monthMode, refMonth,
-      kpis: { ce, r2, mandats, tauxTransfo, caGagneMonth, wonCountMonth: wonThisMonth.length, potentiel, potentielCount: potentielDeals.length, remboursementsMonth, remboursementsCount: rembMonthDeals.length },
+      kpis: { ce, r2, mandats, tauxTransfo, revenusTotaux, revTotCount: revTotDeals.length, caGagneMonth, wonCountMonth: wonThisMonth.length, potentiel, potentielCount: potentielDeals.length, remboursementsMonth, remboursementsCount: rembMonthDeals.length },
       trend, finance,
     };
   }
@@ -249,16 +257,21 @@
     const curKey = gran === 'all' ? null : keyOf(new Date(nowMs), gran);
     // Si un mois est sélectionné (opts.month), tout est filtré sur ce mois.
     const inBucket = (ms) => ms != null && (opts.month ? monthKey(new Date(ms)) === opts.month : (gran === 'all' || keyOf(new Date(ms), gran) === curKey));
+    const mv = mapping.mandatValue || 500;
+    const dealValue = (d) => /ghost/i.test(d.title || '') ? 250 : mv;
     const refMonth = opts.month || monthKey(new Date(nowMs));
     const inMonth = (ms) => ms != null && monthKey(new Date(ms)) === refMonth;
     const rows = [];
     for (const d of dScoped) {
       const title = d.title || '(sans nom)';
+      const amount = dealValue(d), ghost = /ghost/i.test(d.title || '');
+      const md = () => parseTs(getCF(d, mapping.mandatDateField));
       if (kind === 'r2') { const t = parseTs(d.add_time); if (t && inBucket(t.getTime())) rows.push({ date: t.getTime(), title }); }
-      else if (kind === 'mandat') { const t = parseTs(getCF(d, mapping.mandatDateField)); if (t && inBucket(t.getTime())) rows.push({ date: t.getTime(), title }); }
-      else if (kind === 'ca') { if (d.status !== 'won') continue; const t = parseTs(d.won_time); if (t && inMonth(t.getTime())) rows.push({ date: t.getTime(), title }); }
-      else if (kind === 'potentiel') { if (d.status !== 'open') continue; const t = parseTs(getCF(d, mapping.mandatDateField)); if (t && (!opts.month || inMonth(t.getTime()))) rows.push({ date: t.getTime(), title }); }
-      else if (kind === 'remboursement') { if (d.status !== 'lost') continue; if (!parseTs(getCF(d, mapping.mandatDateField))) continue; const t = parseTs(d.lost_time); if (t && inMonth(t.getTime())) rows.push({ date: t.getTime(), title }); }
+      else if (kind === 'mandat') { const t = md(); if (t && inBucket(t.getTime())) rows.push({ date: t.getTime(), title, amount, ghost }); }
+      else if (kind === 'revtot') { const t = md(); if (t && inMonth(t.getTime())) rows.push({ date: t.getTime(), title, amount, ghost }); }
+      else if (kind === 'ca') { if (d.status !== 'won') continue; const t = parseTs(d.won_time); if (t && inMonth(t.getTime())) rows.push({ date: t.getTime(), title, amount, ghost }); }
+      else if (kind === 'potentiel') { if (d.status !== 'open') continue; const t = md(); if (t) rows.push({ date: t.getTime(), title, amount, ghost }); }
+      else if (kind === 'remboursement') { if (d.status !== 'lost') continue; if (!md()) continue; const t = parseTs(d.lost_time); if (t && inMonth(t.getTime())) rows.push({ date: t.getTime(), title, amount, ghost }); }
     }
     rows.sort((a, b) => b.date - a.date);
     return rows;

@@ -75,13 +75,13 @@
   /* ---------- Cartes ---------- */
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
   .grid-act{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
-  .grid-fin{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+  .grid-fin{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
   .grid-2{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
 
   .tile{position:relative;overflow:hidden}
   .tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent,var(--brand));opacity:.9}
   #tileCE::before{background:var(--s-ce)} #tileR2::before{background:var(--s-r2)} #tileMandat::before{background:var(--s-mandat)}
-  #tileTaux::before{background:var(--brand)} #tileCA::before{background:var(--good)} #tilePot::before{background:var(--brand)} #tileRemb::before{background:var(--critical)}
+  #tileTaux::before{background:var(--brand)} #tileRevTot::before{background:var(--brand-2)} #tileCA::before{background:var(--good)} #tilePot::before{background:var(--brand)} #tileRemb::before{background:var(--critical)}
   .tile .label{font-size:12.5px;color:var(--text-secondary);font-weight:650;letter-spacing:.01em}
   .tile .label .chip{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px;vertical-align:middle}
   .jsm{display:flex;margin-top:14px}
@@ -159,6 +159,7 @@
   .modal .tag.lead{color:var(--s-ce);border-color:color-mix(in srgb,var(--s-ce) 45%,transparent)}
   .modal .tag.deal{color:var(--s-r2);border-color:color-mix(in srgb,var(--s-r2) 45%,transparent)}
   .modal .tag.appr{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+  .modal .tag.amt{color:var(--good-ink);border-color:color-mix(in srgb,var(--good) 45%,transparent);font-weight:700}
   .modal .close{float:right;cursor:pointer;border:0;background:var(--surface-2);width:32px;height:32px;border-radius:9px;font-size:20px;color:var(--muted);line-height:1}
   .modal .close:hover{color:var(--text-primary)}
   .modal .empty{color:var(--muted);font-size:13px;padding:14px 0}
@@ -170,11 +171,12 @@
 
   /* ---------- Responsive ---------- */
   @media (max-width:920px){ .grid-2{grid-template-columns:1fr} }
+  @media (max-width:920px){ .grid-fin{grid-template-columns:repeat(2,1fr)} }
   @media (max-width:720px){
     .grid-act{grid-template-columns:repeat(2,1fr)}
-    .grid-fin{grid-template-columns:1fr}
     .brand-title{font-size:15px}
   }
+  @media (max-width:420px){ .grid-fin{grid-template-columns:1fr} }
   @media (max-width:560px){
     .wrap{padding:14px 13px 56px}
     .appbar-inner{padding:11px 13px;gap:10px}
@@ -245,6 +247,7 @@
 
     <!-- Finance -->
     <div class="grid-fin">
+      <div class="card tile single" id="tileRevTot"></div>
       <div class="card tile single accent-good" id="tileCA"></div>
       <div class="card tile single" id="tilePot"></div>
       <div class="card tile single accent-crit" id="tileRemb"></div>
@@ -265,7 +268,7 @@
           <span><i class="dot" style="background:var(--s-ce)"></i>CE</span>
           <span><i class="dot" style="background:var(--s-r2)"></i>Affaires créées</span>
           <span><i class="dot" style="background:var(--s-mandat)"></i>Mandats</span>
-          <span id="objLeg" style="display:none"><i class="dot dash" style="background:var(--critical)"></i>Objectif CE</span>
+          <span id="objLeg" style="display:none"><i class="dot dash" style="background:var(--critical)"></i>Objectif mandats</span>
         </div>
         <div id="trendChart"></div>
       </div>
@@ -370,7 +373,7 @@ function lineChart(el,labels,series,gran,objLevel){
   el.querySelectorAll('rect[data-i]').forEach(r=>{
     r.onmousemove=(e)=>{const i=+r.dataset.i;cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.style.opacity='1';
       let rows=series.map(s=>`<span style="color:${s.color}">●</span> ${s.name} : <b>${nf.format(s.data[i])}</b>`).join('<br>');
-      if(objLevel>0) rows+=`<br><span style="color:var(--critical)">┈</span> Objectif CE : <b>${nf1.format(objLevel)}</b>`;
+      if(objLevel>0) rows+=`<br><span style="color:var(--critical)">┈</span> Objectif mandats : <b>${nf1.format(objLevel)}</b>`;
       showTip(e,`<b>${fmtLabel(labels[i],gran)}</b><br>${rows}`);};
     r.onmouseleave=()=>{cross.style.opacity='0';hideTip();};
   });
@@ -397,13 +400,12 @@ function barChart(el,labels,a,b,colA,colB){
 
 // ---------- rendu ----------
 function addLook(id){ const el=$(id); if(!el)return; el.classList.add('clickable'); el.insertAdjacentHTML('beforeend','<span class="look">détail ›</span>'); }
-// Objectif CE selon la granularité (10% de transfo, 20 jours ouvrés) :
-// CE/mois = M×10 · CE/jour = M×10/20 = M/2 · CE/semaine = CE/jour × 5 = M×2,5.
-function objCEForGran(gran){ const M=state.obj; if(!M||M<=0) return 0; return gran==='day'?M/2:gran==='week'?M*2.5:M*10; }
+// Objectif de MANDATS selon la granularité : mois = M, semaine = M/4, jour = M/20 (20 j ouvrés).
+function objMandatForGran(gran){ const M=state.obj; if(!M||M<=0) return 0; return gran==='day'?M/20:gran==='week'?M/4:M; }
 function monthTile(el,title,color,value,sub){
   el.innerHTML=`<div class="label"><i class="chip" style="background:${color}"></i>${title}</div><div class="bigval">${nf.format(value)}</div><div class="subfoot">${sub}</div>`;
 }
-function renderBattery(mandatsMonth,monthLbl){
+function renderBattery(mandatsMonth,monthLbl,transfo){
   const M=state.obj;
   const ratio=(M&&M>0)?mandatsMonth/M:0;
   const filled=Math.max(0,Math.min(10,Math.round(ratio*10)));
@@ -413,14 +415,17 @@ function renderBattery(mandatsMonth,monthLbl){
   const pctEl=$('#battPct'), sum=$('#objSummary'), leg=$('#objLeg');
   if(M&&M>0){
     pctEl.textContent=Math.round(ratio*100)+'%'; pctEl.style.color=color;
-    // 10% de transfo, 20 jours ouvrés : CE/mois = M×10, CE/semaine = M×2,5, CE/jour = M÷2.
-    const ceMonth=M*10, ceWeek=M*2.5, ceDay=M/2;
+    // CE nécessaires = objectif mandats ÷ taux de transfo du commercial (défaut 10 %).
+    const isDef=!(transfo&&transfo>0);
+    const t=isDef?0.10:transfo;
+    const pctT=Math.round(t*1000)/10; // 1 décimale
+    const ceMonth=M/t, ceWeek=ceMonth/4, ceDay=ceMonth/20;
     sum.innerHTML=
       `<div class="osum-line">🎯 <b>${nf.format(M)}</b> mandats/mois</div>`+
-      `<div class="osum-line">📞 <b>${nf.format(ceMonth)}</b> contacts établis/mois</div>`+
+      `<div class="osum-line">📞 <b>${nf1.format(ceMonth)}</b> contacts établis/mois</div>`+
       `<div class="osum-line">📅 <b>${nf1.format(ceWeek)}</b> contacts établis/semaine</div>`+
       `<div class="osum-line">☎️ <b>${nf1.format(ceDay)}</b> contacts établis/jour</div>`+
-      `<div class="osum-note">${nf1.format(ceDay)} CE/j × 20 j = ${nf.format(ceMonth)} CE/mois → × 10 % = ${nf.format(M)} mandats · taux de transfo 10 %</div>`;
+      `<div class="osum-note">à ${nf1.format(pctT)} % de transfo ${isDef?'(défaut)':'(taux du commercial)'} · ${nf1.format(ceDay)} CE/j × 20 j = ${nf1.format(ceMonth)} CE/mois → × ${nf1.format(pctT)} % = ${nf.format(M)} mandats</div>`;
     if(leg) leg.style.display='';
   } else {
     pctEl.textContent='—'; pctEl.style.color='var(--muted)';
@@ -442,12 +447,13 @@ function render(d){
   singleTile($('#tileTaux'),`Taux de transformation (${ml})`,pct(k.tauxTransfo),
     `${nf.format(k.mandats.month)} mandats / ${nf.format(k.ce.month)} CE`);
 
-  singleTile($('#tileCA'),`Revenus générés (${ml})`,money(k.caGagneMonth),`${nf.format(k.wonCountMonth)} dossiers facturés × ${money(d.mandatValue)}`);
-  singleTile($('#tilePot'),mm?`Potentiel revenu (${ml})`:'Potentiel revenu',money(k.potentiel),`${nf.format(k.potentielCount)} mandats ${mm?'signés ce mois':'en cours'}`);
+  singleTile($('#tileRevTot'),`Revenus totaux (${ml})`,money(k.revenusTotaux),`${nf.format(k.revTotCount)} mandats du mois · gagnés + en cours + perdus`);
+  singleTile($('#tileCA'),`Revenus encaissés (${ml})`,money(k.caGagneMonth),`${nf.format(k.wonCountMonth)} dossiers gagnés`);
+  singleTile($('#tilePot'),'Potentiel revenu',money(k.potentiel),`${nf.format(k.potentielCount)} mandats en cours`);
   singleTile($('#tileRemb'),`Dossiers remboursés (${ml})`,money(k.remboursementsMonth),`${nf.format(k.remboursementsCount)} dossiers remboursés`);
 
-  ['#tileCE','#tileR2','#tileMandat','#tileCA','#tilePot','#tileRemb'].forEach(addLook);
-  renderBattery(k.mandats.month, mm?ml:null);
+  ['#tileCE','#tileR2','#tileMandat','#tileRevTot','#tileCA','#tilePot','#tileRemb'].forEach(addLook);
+  renderBattery(k.mandats.month, mm?ml:null, k.tauxTransfo);
 
   $('#mvLabel').textContent=money(d.mandatValue);
   const cs=getComputedStyle(document.body);
@@ -455,7 +461,7 @@ function render(d){
     {name:'CE',color:cs.getPropertyValue('--s-ce'),data:d.trend.ce},
     {name:'Affaires créées',color:cs.getPropertyValue('--s-r2'),data:d.trend.r2},
     {name:'Mandats',color:cs.getPropertyValue('--s-mandat'),data:d.trend.mandats},
-  ],d.gran,objCEForGran(d.gran));
+  ],d.gran,objMandatForGran(d.gran));
   barChart($('#finChart'),d.finance.labels,d.finance.ca,d.finance.remboursements,cs.getPropertyValue('--good'),cs.getPropertyValue('--critical'));
 }
 
@@ -538,7 +544,8 @@ const DETAIL={
   ce:{label:'CE — Contacts établis',period:()=>state.gran},
   r2:{label:'R2 — Affaires créées',period:()=>state.gran},
   mandat:{label:'Mandats rentrés',period:()=>state.gran},
-  ca:{label:'Revenus générés',period:()=>'month'},
+  revtot:{label:'Revenus totaux',period:()=>'month'},
+  ca:{label:'Revenus encaissés',period:()=>'month'},
   potentiel:{label:'Potentiel revenu',period:()=>'all'},
   remboursement:{label:'Dossiers remboursés',period:()=>'month'},
 };
@@ -561,13 +568,17 @@ function openDetail(kind){
       let tags;
       if(x.inLead!==undefined){
         tags=(x.inLead&&x.inDeal?'<span class="tag lead">prospect</span> <span class="tag deal">affaire</span>':x.inLead?'<span class="tag lead">prospect</span>':'<span class="tag deal">affaire</span>')+(x.stamped?'':' <span class="tag appr" title="Daté à la création">approx.</span>');
-      } else { tags='<span class="tag deal">affaire</span>'; }
+      } else {
+        let extra='';
+        if(x.amount!=null){ extra=`<span class="tag amt">${money(x.amount)}</span> `+(x.ghost?'<span class="tag appr">ghost</span> ':''); }
+        tags=extra+'<span class="tag deal">affaire</span>';
+      }
       return `<tr><td class="dt">${d}</td><td>${escapeHtml(x.title)}</td><td style="text-align:right">${tags}</td></tr>`;
     }).join('')+'</table>';
   }
   $('#ceModal').classList.add('on');
 }
-[['tileCE','ce'],['tileR2','r2'],['tileMandat','mandat'],['tileCA','ca'],['tilePot','potentiel'],['tileRemb','remboursement']].forEach(([id,kind])=>{
+[['tileCE','ce'],['tileR2','r2'],['tileMandat','mandat'],['tileRevTot','revtot'],['tileCA','ca'],['tilePot','potentiel'],['tileRemb','remboursement']].forEach(([id,kind])=>{
   const el=document.getElementById(id); if(el) el.addEventListener('click',()=>openDetail(kind));
 });
 $('#ceClose').onclick=()=>$('#ceModal').classList.remove('on');

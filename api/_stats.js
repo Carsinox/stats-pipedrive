@@ -197,20 +197,26 @@ function computeStats({ deals = [], activities = [], persons = [], leads = [], p
 
   const tauxTransfo = ce.month > 0 ? mandats.month / ce.month : null;
 
+  // Valeur par dossier : 250 € si "ghost" dans le titre, sinon la valeur de mandat.
+  const dealValue = (d) => /ghost/i.test(d.title || '') ? 250 : mv;
+  const sumV = (arr) => arr.reduce((t, d) => t + dealValue(d), 0);
+
+  // Revenus totaux : tous les mandats du mois (quel que soit le statut).
+  const revTotDeals = mandatDeals.filter((d) => monthKey(parseTs(getCF(d, mapping.mandatDateField))) === refMonth);
+  const revenusTotaux = sumV(revTotDeals);
+  // Revenus encaissés : affaires gagnées du mois.
   const wonThisMonth = dScoped.filter((d) => d.status === 'won' && (() => {
     const wt = parseTs(d.won_time); return wt && monthKey(wt) === refMonth;
   })());
-  const caGagneMonth = wonThisMonth.length * mv;
-
-  const potentielDeals = monthMode
-    ? mandatDeals.filter((d) => d.status === 'open' && monthKey(parseTs(getCF(d, mapping.mandatDateField))) === refMonth)
-    : mandatDeals.filter((d) => d.status === 'open');
-  const potentiel = potentielDeals.length * mv;
-
+  const caGagneMonth = sumV(wonThisMonth);
+  // Potentiel : en cours avec date de règlement mandat (peu importe la date).
+  const potentielDeals = mandatDeals.filter((d) => d.status === 'open');
+  const potentiel = sumV(potentielDeals);
+  // Remboursements du mois : perdues ce mois avec date de règlement mandat.
   const rembMonthDeals = mandatDeals.filter((d) => d.status === 'lost' && (() => {
     const lt = parseTs(d.lost_time); return lt && monthKey(lt) === refMonth;
   })());
-  const remboursementsMonth = rembMonthDeals.length * mv;
+  const remboursementsMonth = sumV(rembMonthDeals);
 
   // ----- Séries pour graphiques -----
   const trend = {
@@ -227,11 +233,11 @@ function computeStats({ deals = [], activities = [], persons = [], leads = [], p
   dScoped.forEach((d) => {
     if (d.status === 'won') {
       const wt = parseTs(d.won_time);
-      if (wt && caByMonth.has(monthKey(wt))) caByMonth.set(monthKey(wt), caByMonth.get(monthKey(wt)) + mv);
+      if (wt && caByMonth.has(monthKey(wt))) caByMonth.set(monthKey(wt), caByMonth.get(monthKey(wt)) + dealValue(d));
     }
     if (d.status === 'lost' && parseTs(getCF(d, mapping.mandatDateField))) {
       const lt = parseTs(d.lost_time);
-      if (lt && rembByMonth.has(monthKey(lt))) rembByMonth.set(monthKey(lt), rembByMonth.get(monthKey(lt)) + mv);
+      if (lt && rembByMonth.has(monthKey(lt))) rembByMonth.set(monthKey(lt), rembByMonth.get(monthKey(lt)) + dealValue(d));
     }
   });
   const finance = {
@@ -252,6 +258,8 @@ function computeStats({ deals = [], activities = [], persons = [], leads = [], p
     kpis: {
       ce, r2, mandats,
       tauxTransfo,
+      revenusTotaux,
+      revTotCount: revTotDeals.length,
       caGagneMonth,
       wonCountMonth: wonThisMonth.length,
       potentiel,

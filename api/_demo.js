@@ -84,6 +84,7 @@ function buildDemo(nowMs) {
         person_id = 90000 + id; call_result = 21;
       }
 
+      if (rnd() < 0.15) title = 'GHOST ' + title; // ~15% de dossiers "ghost" (250 €)
       const deal = {
         id: id, title, person_id, pipeline_id, owner_id: owner, currency: 'EUR',
         add_time: iso(addMs), update_time: iso(addMs + Math.floor(rnd() * 20) * DAY),

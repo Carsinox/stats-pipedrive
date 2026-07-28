@@ -25,6 +25,19 @@ check('Mandats du mois (date règlement)', () => assert.strictEqual(s.kpis.manda
 check('CA gagné = facturées × 500', () => assert.strictEqual(s.kpis.caGagneMonth, 2 * 500));
 check('Potentiel = en cours avec date × 500', () => assert.strictEqual(s.kpis.potentiel, 2 * 500));
 check('Remboursements = perdus avec date × 500', () => assert.strictEqual(s.kpis.remboursementsMonth, 1 * 500));
+check('Revenus totaux = tous les mandats du mois × valeur', () => assert.strictEqual(s.kpis.revenusTotaux, 5 * 500)); // d1,d2,d3,d5,d6
+check('Potentiel reste global même en mois sélectionné', () => {
+  const sJ = computeStats({ deals, pipelines }, MAP, { nowMs: NOW, gran: 'month', month: '2026-06' });
+  assert.strictEqual(sJ.kpis.potentiel, 2 * 500); // d2,d5 en cours, non filtré par mois
+});
+// ghost = 250 € au lieu de 500 €
+const ghostDeals = [
+  { id: 1, pipeline_id: 1, status: 'won', add_time: iso(2026, 7, 5), won_time: iso(2026, 7, 12), title: 'GHOST Golf 8', custom_fields: { md: '2026-07-08' } },
+  { id: 2, pipeline_id: 1, status: 'won', add_time: iso(2026, 7, 6), won_time: iso(2026, 7, 13), title: 'Golf normal', custom_fields: { md: '2026-07-09' } },
+];
+const sg = computeStats({ deals: ghostDeals, pipelines }, MAP, { nowMs: NOW, gran: 'month' });
+check('ghost compté à 250 € (encaissés)', () => assert.strictEqual(sg.kpis.caGagneMonth, 250 + 500));
+check('ghost compté à 250 € (revenus totaux)', () => assert.strictEqual(sg.kpis.revenusTotaux, 250 + 500));
 
 const s1 = computeStats({ deals, pipelines }, { ...MAP, pipelines: [1] }, { nowMs: NOW, gran: 'month' });
 check('filtre pipeline 1 : CA', () => assert.strictEqual(s1.kpis.caGagneMonth, 1 * 500));
