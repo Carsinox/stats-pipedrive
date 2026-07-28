@@ -110,7 +110,11 @@
   .objrow input{font:inherit;font-size:20px;font-weight:750;width:130px;padding:10px 13px;border-radius:12px;
     border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-variant-numeric:tabular-nums}
   .objrow input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 28%,transparent)}
-  .obj-hint{font-size:12.5px;color:var(--muted);max-width:260px;line-height:1.4}
+  .obj-summary{font-size:13.5px;color:var(--text-secondary);line-height:1.6;max-width:340px}
+  .obj-summary .osum-line{display:flex;gap:8px;align-items:baseline}
+  .obj-summary b{color:var(--text-primary);font-weight:750;font-variant-numeric:tabular-nums}
+  .obj-summary .osum-note{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.45}
+  .obj-summary .osum-empty{color:var(--muted)}
   .batt-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;flex:none}
   .battery{display:flex;align-items:center;gap:3px;padding:5px 6px;border:2px solid var(--baseline);border-radius:9px;background:var(--surface)}
   .battery .cell{width:9px;height:28px;border-radius:2px;background:var(--grid);transition:background .3s}
@@ -221,8 +225,8 @@
         <label>Objectif mensuel de mandats</label>
         <div class="objrow">
           <input id="objInput" type="number" min="0" inputmode="numeric" placeholder="ex : 30" />
-          <span class="obj-hint" id="objHint"></span>
         </div>
+        <div class="obj-summary" id="objSummary"></div>
       </div>
       <div class="batt-wrap">
         <div class="battery" id="battery" title="Progression vers l'objectif de mandats du mois"></div>
@@ -301,6 +305,7 @@ const tooltip = $('#tooltip');
 (function(){try{const o=localStorage.getItem('pd_obj');if(o){const n=parseInt(o,10);state.obj=(Number.isFinite(n)&&n>0)?n:null;}}catch(_){}})();
 
 const nf = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
+const nf1 = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1});
 function money(v){ try{return new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v||0);}catch(_){return nf.format(v||0)+' €';} }
 function moneyK(v){ return v>=1000 ? (v/1000).toFixed(v>=10000?0:1).replace('.',',')+' k€' : nf.format(Math.round(v))+' €'; }
 const pct=(x)=> x==null?'—':(x*100).toFixed(0)+' %';
@@ -353,7 +358,7 @@ function lineChart(el,labels,series,gran,objLevel){
   let obj='';
   if(objLevel>0){const oy=y(objLevel);
     obj=`<line x1="${padL}" y1="${oy}" x2="${W-padR}" y2="${oy}" stroke="var(--critical)" stroke-width="1.8" stroke-dasharray="5 4"/>
-      <text x="${W-padR}" y="${oy-4}" text-anchor="end" font-size="9.5" fill="var(--critical)">objectif ${nf.format(objLevel)}</text>`;}
+      <text x="${W-padR}" y="${oy-4}" text-anchor="end" font-size="9.5" fill="var(--critical)">objectif ${nf1.format(objLevel)}</text>`;}
   // overlay hover
   let hit='';
   labels.forEach((k,i)=>{ const xx=x(i);
@@ -365,7 +370,7 @@ function lineChart(el,labels,series,gran,objLevel){
   el.querySelectorAll('rect[data-i]').forEach(r=>{
     r.onmousemove=(e)=>{const i=+r.dataset.i;cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.style.opacity='1';
       let rows=series.map(s=>`<span style="color:${s.color}">●</span> ${s.name} : <b>${nf.format(s.data[i])}</b>`).join('<br>');
-      if(objLevel>0) rows+=`<br><span style="color:var(--critical)">┈</span> Objectif CE : <b>${nf.format(objLevel)}</b>`;
+      if(objLevel>0) rows+=`<br><span style="color:var(--critical)">┈</span> Objectif CE : <b>${nf1.format(objLevel)}</b>`;
       showTip(e,`<b>${fmtLabel(labels[i],gran)}</b><br>${rows}`);};
     r.onmouseleave=()=>{cross.style.opacity='0';hideTip();};
   });
@@ -392,8 +397,9 @@ function barChart(el,labels,a,b,colA,colB){
 
 // ---------- rendu ----------
 function addLook(id){ const el=$(id); if(!el)return; el.classList.add('clickable'); el.insertAdjacentHTML('beforeend','<span class="look">détail ›</span>'); }
-// Objectif CE selon la granularité (10% de transfo) : jour = M, semaine = M×5, mois = M×10.
-function objCEForGran(gran){ const M=state.obj; if(!M||M<=0) return 0; return gran==='day'?M:gran==='week'?M*5:M*10; }
+// Objectif CE selon la granularité (10% de transfo, 20 jours ouvrés) :
+// CE/mois = M×10 · CE/jour = M×10/20 = M/2 · CE/semaine = CE/jour × 5 = M×2,5.
+function objCEForGran(gran){ const M=state.obj; if(!M||M<=0) return 0; return gran==='day'?M/2:gran==='week'?M*2.5:M*10; }
 function monthTile(el,title,color,value,sub){
   el.innerHTML=`<div class="label"><i class="chip" style="background:${color}"></i>${title}</div><div class="bigval">${nf.format(value)}</div><div class="subfoot">${sub}</div>`;
 }
@@ -404,14 +410,21 @@ function renderBattery(mandatsMonth,monthLbl){
   const color = ratio>=0.9?'var(--good)' : ratio>0.6?'var(--brand-2)' : ratio>=0.4?'#EE9A34' : 'var(--critical)';
   let cells=''; for(let i=0;i<10;i++) cells+=`<span class="cell" style="background:${i<filled?color:'var(--grid)'}"></span>`;
   $('#battery').innerHTML=cells;
-  const pctEl=$('#battPct'), hint=$('#objHint'), leg=$('#objLeg');
+  const pctEl=$('#battPct'), sum=$('#objSummary'), leg=$('#objLeg');
   if(M&&M>0){
     pctEl.textContent=Math.round(ratio*100)+'%'; pctEl.style.color=color;
-    hint.innerHTML=`≈ <b>${nf.format(M)} CE/jour</b> visés (à 10 % de transfo) · ${nf.format(mandatsMonth)}/${nf.format(M)} mandats (${monthLbl||'ce mois'})`;
+    // 10% de transfo, 20 jours ouvrés : CE/mois = M×10, CE/semaine = M×2,5, CE/jour = M÷2.
+    const ceMonth=M*10, ceWeek=M*2.5, ceDay=M/2;
+    sum.innerHTML=
+      `<div class="osum-line">🎯 <b>${nf.format(M)}</b> mandats/mois</div>`+
+      `<div class="osum-line">📞 <b>${nf.format(ceMonth)}</b> contacts établis/mois</div>`+
+      `<div class="osum-line">📅 <b>${nf1.format(ceWeek)}</b> contacts établis/semaine</div>`+
+      `<div class="osum-line">☎️ <b>${nf1.format(ceDay)}</b> contacts établis/jour</div>`+
+      `<div class="osum-note">${nf1.format(ceDay)} CE/j × 20 j = ${nf.format(ceMonth)} CE/mois → × 10 % = ${nf.format(M)} mandats · taux de transfo 10 %</div>`;
     if(leg) leg.style.display='';
   } else {
     pctEl.textContent='—'; pctEl.style.color='var(--muted)';
-    hint.textContent="Saisis un objectif pour activer la jauge et la courbe cible.";
+    sum.innerHTML='<span class="osum-empty">Saisis un objectif pour activer la jauge, la courbe cible et le résumé des CE à réaliser.</span>';
     if(leg) leg.style.display='none';
   }
 }
