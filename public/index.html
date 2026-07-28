@@ -75,7 +75,7 @@
   /* ---------- Cartes ---------- */
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
   .grid-act{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
-  .grid-fin{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+  .grid-fin{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
   .grid-2{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
 
   .tile{position:relative;overflow:hidden}
@@ -201,14 +201,16 @@
   .tt b{font-weight:700}
 
   /* ---------- Responsive ---------- */
+  @media (max-width:980px){ .grid-fin{grid-template-columns:repeat(2,1fr)} }
   @media (max-width:920px){ .grid-2{grid-template-columns:1fr} }
   @media (max-width:720px){
     .grid-act{grid-template-columns:repeat(2,1fr)}
-    .grid-fin{grid-template-columns:1fr}
+    .grid-fin{grid-template-columns:repeat(2,1fr)}
     .brand-title{font-size:15px}
   }
   @media (max-width:560px){
     .wrap{padding:14px 13px 56px}
+    .grid-fin{grid-template-columns:1fr}
     .appbar-inner{padding:11px 13px;gap:10px}
     .logo-img{height:32px}
     .card{padding:15px;border-radius:14px}
@@ -286,6 +288,7 @@
       <div class="card tile single accent-good" id="tileCA"></div>
       <div class="card tile single" id="tilePot"></div>
       <div class="card tile single accent-crit" id="tileRemb"></div>
+      <div class="card tile single" id="tileAnnul"></div>
     </div>
 
     <!-- Classement général -->
@@ -383,6 +386,20 @@ function actTile(el,title,color,vals){
 }
 function singleTile(el,label,value,foot){
   el.innerHTML=`<div class="label">${label}</div><div class="value">${value}</div><div class="foot">${foot||''}</div>`;
+}
+// Taux d'annulation = remboursements / mandats rentrés du mois (couleur par palier)
+function renderAnnul(el,mandats,remb,ml){
+  const rate = mandats>0 ? remb/mandats*100 : null;
+  const color = rate==null ? 'var(--muted)'
+    : rate<10 ? 'var(--good)'
+    : rate<20 ? 'var(--brand-2)'
+    : rate<=30 ? '#EE9A34'
+    : '#FF2D2D';
+  const val = rate==null ? '—' : nf1.format(rate)+' %';
+  el.style.setProperty('--accent',color);
+  el.innerHTML=`<div class="label">Taux d'annulation (${ml})</div>`+
+    `<div class="value" style="color:${color}">${val}</div>`+
+    `<div class="foot">${nf.format(remb)} remb / ${nf.format(mandats)} mandats rentrés</div>`;
 }
 
 // ---------- graphique multi-lignes ----------
@@ -531,6 +548,7 @@ function render(d){
   singleTile($('#tileCA'),`Revenus encaissés (${ml})`,money(k.caGagneMonth),`${nf.format(k.wonCountMonth)} dossiers gagnés`);
   singleTile($('#tilePot'),'Potentiel revenu',money(k.potentiel),`${nf.format(k.potentielCount)} mandats en cours`);
   singleTile($('#tileRemb'),`Dossiers remboursés (${ml})`,money(k.remboursementsMonth),`${nf.format(k.remboursementsCount)} dossiers remboursés`);
+  renderAnnul($('#tileAnnul'), k.mandats.month, k.remboursementsCount, ml);
 
   ['#tileCE','#tileR2','#tileMandat','#tileCA','#tilePot','#tileRemb'].forEach(addLook);
   renderBattery(k.mandats.month, mm?ml:null, k.tauxTransfo);
