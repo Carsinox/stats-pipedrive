@@ -277,5 +277,30 @@
     return rows;
   }
 
-  window.PDStats = { computeStats, detail };
+  // Classement des commerciaux pour la période (mois courant ou mois sélectionné).
+  // Ignore le filtre commercial (c'est un classement de tous), respecte le filtre pipeline.
+  function ranking(data, mapping, opts) {
+    const deals = data.deals || [], users = data.users || [];
+    const nowMs = opts.nowMs;
+    const refMonth = opts.month || monthKey(new Date(nowMs));
+    const pipeFilter = (mapping.pipelines && mapping.pipelines.length) ? new Set(mapping.pipelines.map(Number)) : null;
+    const inScope = (d) => !pipeFilter || pipeFilter.has(Number(d.pipeline_id));
+    const nameOf = new Map(users.map((u) => [Number(u.id), u.name]));
+    const inMonth = (ms) => ms != null && monthKey(new Date(ms)) === refMonth;
+    const M = new Map(), E = new Map();
+    for (const d of deals) {
+      if (d.status === 'deleted' || !inScope(d)) continue;
+      const o = ownerOf(d); if (o == null) continue;
+      const md = parseTs(getCF(d, mapping.mandatDateField));
+      if (md && inMonth(md.getTime())) M.set(o, (M.get(o) || 0) + 1);
+      if (d.status === 'won') { const wt = parseTs(d.won_time); if (wt && inMonth(wt.getTime())) E.set(o, (E.get(o) || 0) + 1); }
+    }
+    const build = (map) => [...map.entries()]
+      .map(([id, count]) => ({ id, name: nameOf.get(id) || ('#' + id), count }))
+      .filter((x) => x.count > 0)
+      .sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name), 'fr'));
+    return { mandats: build(M), encaisses: build(E), refMonth };
+  }
+
+  window.PDStats = { computeStats, detail, ranking };
 })();

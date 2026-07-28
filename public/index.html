@@ -131,6 +131,23 @@
   @media (max-width:560px){ .objbar{justify-content:center;text-align:center} .objbar .oi{align-items:center} .objrow{justify-content:center} .obj-hint{max-width:none} }
 
   .card h2{font-size:15px;margin:0 0 2px;font-weight:700;letter-spacing:-.01em}
+  /* Classement */
+  .rank-card{margin-bottom:18px}
+  .rank-sub{font-size:12.5px;color:var(--muted);font-weight:600;text-transform:capitalize}
+  .rank-cols{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:12px}
+  @media(max-width:640px){ .rank-cols{grid-template-columns:1fr;gap:18px} }
+  .rank-head{display:flex;align-items:center;gap:9px;font-weight:700;font-size:14px;margin-bottom:6px}
+  .rank-head svg{flex:none}
+  .rank-list{list-style:none;margin:0;padding:0}
+  .rank-list li{display:flex;align-items:center;gap:11px;padding:9px 6px;border-bottom:1px solid var(--border)}
+  .rank-list li:last-child{border-bottom:0}
+  .rank-list .rk{width:25px;height:25px;flex:none;display:grid;place-items:center;font-size:12px;font-weight:800;border-radius:7px;background:var(--surface-2);color:var(--text-secondary)}
+  .rank-list .rn{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rank-list .rc{font-weight:800;font-variant-numeric:tabular-nums;font-size:17px}
+  .rank-list li.me{background:color-mix(in srgb,var(--brand) 14%,transparent);border-radius:8px}
+  .rank-list .empty{color:var(--muted);font-size:13px;justify-content:center;padding:14px 0}
+  #rankEncaisses li.top .rk{background:#D4AF37;color:#3a2f00}
+  #rankMandats li.top .rk{background:#A8B4C0;color:#22303a}
   .card .hint{font-size:12.5px;color:var(--muted);margin:0 0 12px}
   .chart-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
   .legend{display:flex;gap:14px;font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;flex-wrap:wrap}
@@ -259,6 +276,21 @@
       <div class="card tile single accent-good" id="tileCA"></div>
       <div class="card tile single" id="tilePot"></div>
       <div class="card tile single accent-crit" id="tileRemb"></div>
+    </div>
+
+    <!-- Classement général -->
+    <div class="card rank-card">
+      <h2>Classement général <span class="rank-sub" id="rankPeriod"></span></h2>
+      <div class="rank-cols">
+        <div class="rank-col">
+          <div class="rank-head"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="#A8B4C0" d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0 0 11 18.9V21H8v2h8v-2h-3v-2.1a5.01 5.01 0 0 0 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg> Mandats rentrés</div>
+          <ol id="rankMandats" class="rank-list"></ol>
+        </div>
+        <div class="rank-col">
+          <div class="rank-head"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="#D4AF37" d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0 0 11 18.9V21H8v2h8v-2h-3v-2.1a5.01 5.01 0 0 0 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg> Mandats transformés (encaissés)</div>
+          <ol id="rankEncaisses" class="rank-list"></ol>
+        </div>
+      </div>
     </div>
 
     <!-- Graphiques -->
@@ -441,6 +473,14 @@ function renderBattery(mandatsMonth,monthLbl,transfo){
     if(leg) leg.style.display='none';
   }
 }
+function renderRanking(rk,periodLbl){
+  $('#rankPeriod').textContent='· '+periodLbl;
+  const me=state.user==='all'?null:Number(state.user);
+  const row=(x,i)=>`<li class="${i===0?'top':''} ${me&&x.id===me?'me':''}"><span class="rk">${i+1}</span><span class="rn">${escapeHtml(x.name)}</span><span class="rc">${nf.format(x.count)}</span></li>`;
+  const fill=(el,arr)=>{ el.innerHTML = arr.length ? arr.map(row).join('') : '<li class="empty">Aucun sur cette période</li>'; };
+  fill($('#rankMandats'),rk.mandats);
+  fill($('#rankEncaisses'),rk.encaisses);
+}
 function render(d){
   const k=d.kpis, mm=d.monthMode, ml=mm?monthLabelFr(d.refMonth):'mois';
   if(mm){
@@ -461,6 +501,9 @@ function render(d){
 
   ['#tileCE','#tileR2','#tileMandat','#tileCA','#tilePot','#tileRemb'].forEach(addLook);
   renderBattery(k.mandats.month, mm?ml:null, k.tauxTransfo);
+
+  const rk=window.PDStats.ranking(state.raw, state.mapping, {nowMs:Date.parse(state.raw.generatedAt)||Date.now(), month: state.month||undefined});
+  renderRanking(rk, mm?ml:'mois en cours');
 
   $('#mvLabel').textContent=money(d.mandatValue);
   const cs=getComputedStyle(document.body);
