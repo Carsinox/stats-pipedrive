@@ -65,9 +65,7 @@
       <div class="sub" id="subline">Chargement…</div>
     </div>
     <div class="appbar-actions">
-      <span class="demo-badge" id="demoBadge">Démo</span>
-      <a class="navlink ghost" href="/">← Ventes</a>
-      <a class="navlink ghost" href="/projets.html">Projets</a>
+      <a class="navlink" href="/">← Ventes</a>
       <button class="icon-btn" id="refreshBtn" title="Actualiser">↻</button>
       <button class="icon-btn" id="themeBtn" title="Thème">◐</button>
       <button class="icon-btn" id="logoutBtn" title="Se déconnecter" style="display:none">⎋</button>
@@ -207,12 +205,14 @@ async function load(force){
     const d=await r.json();
     if(d.error) throw new Error(d.message||'Erreur');
     state.raw=d; fillRi(d);
-    $('#demoBadge').style.display=d.demo?'inline-block':'none';
     const when=new Date(d.generatedAt).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
-    $('#subline').textContent=(d.demo?'Aperçu (données simulées)':'Vos projets Pipedrive')+' · maj '+when;
-    $('#riNote').innerHTML = d.demo
-      ? "⚠ Mode démo. Un seul prérequis pour vos vraies données (aucune automatisation) : indiquer la clé du champ « Relation Garage » dans la variable PIPEDRIVE_RI_FIELD."
-      : "Réparti par « Relation Garage », sans automatisation : tout est calculé sur l'étape actuelle, le statut et la dernière mise à jour du projet.";
+    if(d.empty){
+      $('#subline').textContent='Aucun projet récupéré';
+      $('#riNote').innerHTML="⚠ Aucun projet récupéré (raison : <b>"+esc(d.reason||'?')+"</b>). Ouvre <code>/api/ri?debug=1</code> et envoie le résultat pour diagnostic.";
+    } else {
+      $('#subline').textContent='Vos projets Pipedrive · maj '+when;
+      $('#riNote').innerHTML="Réparti par « Relation Garage», sans automatisation : calculé sur la phase, le statut et la dernière mise à jour du projet.";
+    }
     compute();
     $('#statusBox').style.display='none';$('#content').style.display='block';
   }catch(e){ $('#statusBox').innerHTML='⚠ '+esc(e.message); }

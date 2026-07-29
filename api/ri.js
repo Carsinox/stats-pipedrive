@@ -9,7 +9,7 @@
 
 const { getConfig, pdGetAll, pdGetAllV1, pdGet } = require('./_pipedrive');
 const { isAuthed, authRequired } = require('./_auth');
-const { buildRiDemo, RI_COLLABS } = require('./_ri');
+const { RI_COLLABS } = require('./_ri');
 
 const RI_DEFAULT_FIELD = '92d31d377c1db9853b11373dcc6186b01da2da32'; // "Relation Garage" (champ user)
 
@@ -35,14 +35,14 @@ module.exports = async (req, res) => {
   const cfg = getConfig();
   let riField = process.env.PIPEDRIVE_RI_FIELD || RI_DEFAULT_FIELD;
 
-  const sendDemo = (reason, extra) => {
-    const d = buildRiDemo(nowMs);
+  // Plus de démo : on renvoie un état vide honnête (la page affiche un message clair).
+  const sendEmpty = (reason, extra) => {
     res.setHeader('Cache-Control', 'no-store');
     res.statusCode = 200;
-    res.end(JSON.stringify({ demo: true, reason, ...(extra || {}), generatedAt: new Date(nowMs).toISOString(), ...d }));
+    res.end(JSON.stringify({ demo: false, empty: true, reason, ...(extra || {}), generatedAt: new Date(nowMs).toISOString(), projects: [], phases: [], boards: [], collaborators: RI_COLLABS, riField }));
   };
 
-  if (!cfg) return sendDemo('no_token');
+  if (!cfg) return sendEmpty('no_token');
 
   // Récupération avec capture d'erreur par appel (pour le diagnostic).
   const errs = {};
@@ -121,7 +121,7 @@ module.exports = async (req, res) => {
   res.setHeader('Cache-Control', authRequired() ? 'private, max-age=120' : 's-maxage=120, stale-while-revalidate=86400');
 
   if (!Array.isArray(projectsRaw) || !projectsRaw.length) {
-    return sendDemo('no_projects', errs.projects ? { errorMessage: errs.projects } : undefined);
+    return sendEmpty('no_projects', { errors: errs, endpointsUsed });
   }
 
   const projects = projectsRaw.map((p) => ({
