@@ -57,14 +57,7 @@ module.exports = async (req, res) => {
     return { v: [], used: null };
   };
 
-  const [projRes, boardRes, fieldDefs, users] = await Promise.all([
-    firstOk('projects', [
-      // On veut les projets RÉCENTS (l'API renvoie sinon les 500 plus anciens = ex-collaborateurs).
-      { label: 'v1 /projects sort update_time DESC', fn: () => pdGetAllV1('/projects', { sort: 'update_time DESC' }) },
-      { label: 'v1 /projects sort add_time DESC', fn: () => pdGetAllV1('/projects', { sort: 'add_time DESC' }) },
-      { label: 'v1 /projects', fn: () => pdGetAllV1('/projects') },
-      { label: 'v2 /projects', fn: () => pdGetAll('/projects') },
-    ]),
+  const [boardRes, fieldDefs, users] = await Promise.all([
     firstOk('boards', [
       { label: 'v1 /projects/boards', fn: () => pdGetAllV1('/projects/boards') },
       { label: 'v2 /projects/boards', fn: () => pdGetAll('/projects/boards') },
@@ -72,9 +65,31 @@ module.exports = async (req, res) => {
     safe('projectFields', pdGetAll('/projectFields')),
     safe('users', pdGet('/users', {}, 'v1').then((r) => r.data || [])),
   ]);
-  // Déduplication de sécurité par id (au cas où la pagination renverrait des doublons).
+
+  // ---- Projets : on veut les plus RÉCENTS ----
+  // L'API v1 ignore start/sort sur ce compte et renvoie un jeu fixe (souvent les plus anciens).
+  // On tente donc plusieurs stratégies et on GARDE celle dont la date la plus récente est la plus élevée.
+  const srvT = (s) => { if (!s) return 0; const d = new Date(String(s).replace(' ', 'T')); return isNaN(d) ? 0 : d.getTime(); };
+  const projCandidates = [
+    { label: 'v2 /projects', fn: () => pdGetAll('/projects') },
+    { label: 'v1 sort update_time DESC', fn: () => pdGetAllV1('/projects', { sort: 'update_time DESC' }) },
+    { label: 'v1 sort add_time DESC', fn: () => pdGetAllV1('/projects', { sort: 'add_time DESC' }) },
+    { label: 'v1 order_by update_time desc', fn: () => pdGetAllV1('/projects', { order_by: 'update_time', order_direction: 'desc' }) },
+    { label: 'v1 default', fn: () => pdGetAllV1('/projects') },
+  ];
+  let projectsRawSel = [], projUsed = null, projMax = -1;
+  for (const c of projCandidates) {
+    try {
+      const v = await c.fn();
+      if (Array.isArray(v) && v.length) {
+        const mx = Math.max(...v.map((p) => srvT(p.update_time) || srvT(p.add_time)));
+        if (mx > projMax) { projMax = mx; projectsRawSel = v; projUsed = c.label; }
+      }
+    } catch (e) { errs['projects:' + c.label] = String((e && e.message) || e); }
+  }
+  // Déduplication de sécurité par id.
   const seenIds = new Set();
-  const projectsRaw = (projRes.v || []).filter((p) => { const k = p && p.id; if (k == null) return true; if (seenIds.has(k)) return false; seenIds.add(k); return true; });
+  const projectsRaw = projectsRawSel.filter((p) => { const k = p && p.id; if (k == null) return true; if (seenIds.has(k)) return false; seenIds.add(k); return true; });
   const boards = boardRes.v || [];
   // Les phases se récupèrent PAR board (l'endpoint exige un board_id).
   let phasesRaw = [];
@@ -84,7 +99,7 @@ module.exports = async (req, res) => {
       if (Array.isArray(ph)) phasesRaw = phasesRaw.concat(ph.map((x) => ({ id: x.id, name: x.name, board_id: bd.id, order_nr: x.order_nr })));
     } catch (e) { errs['phases:board:' + bd.id] = String((e && e.message) || e); }
   }
-  const endpointsUsed = { projects: projRes.used, boards: boardRes.used, boardsCount: boards.length };
+  const endpointsUsed = { projects: projUsed, boards: boardRes.used, boardsCount: boards.length };
 
   // Auto-détection du champ RI si la clé n'est pas dans les définitions récupérées.
   const defs = fieldDefs || [];

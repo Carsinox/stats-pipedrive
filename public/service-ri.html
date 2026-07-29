@@ -123,7 +123,7 @@ function stepKey(name){
   if(/attribution|attente/.test(n)) return 'attente_attribution';
   return null;
 }
-function parseD(s){ if(!s)return null; const d=new Date(String(s).length===10?s+'T00:00:00Z':s); return isNaN(d)?null:d; }
+function parseD(s){ if(!s)return null; let x=String(s).trim().replace(' ','T'); if(x.length===10) x+='T00:00:00Z'; else if(!/[zZ]|[+\-]\d\d:?\d\d$/.test(x)) x+='Z'; const d=new Date(x); return isNaN(d)?null:d; }
 function periodStart(nowMs){ const d=new Date(nowMs);const back=state.period==='month'?0:state.period==='3m'?2:state.period==='6m'?5:11; return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()-back,1); }
 
 function bubble(label,value,foot,accent){
@@ -136,8 +136,9 @@ function metrics(list,nowMs,ph){
   const bdc=list.filter(p=>ph.bdcIdx!=null && p.idx!=null && p.idx>=ph.bdcIdx);               // a atteint "BDC à signer"
   const paiement=list.filter(p=>ph.paieId!=null && p.pid===ph.paieId);                        // étape "Paiement total"
   const docs=list.filter(p=>ph.cpiId!=null && p.pid===ph.cpiId);                              // étape "Attente doc CPI"
-  const cancelAfterAR=list.filter(p=>p.status==='canceled' && ph.arIdx!=null && p.idx!=null && p.idx>=ph.arIdx).length;
-  const taux=enCours.length>0 ? cancelAfterAR/enCours.length*100 : null;
+  const reachedAR=list.filter(p=> ph.arIdx!=null && p.idx!=null && p.idx>=ph.arIdx);   // ont atteint "À relancer"
+  const cancelAfterAR=reachedAR.filter(p=>p.status==='canceled').length;
+  const taux=reachedAR.length>0 ? cancelAfterAR/reachedAR.length*100 : null;           // borné à 100 %
   const dels=enCours.map(p=>p.updMs?(nowMs-p.updMs)/3600000:null).filter(v=>v!=null&&v>=0);
   const delai=dels.length ? dels.reduce((a,b)=>a+b,0)/dels.length : null;
   const retard=dels.filter(h=>h>24).length;
@@ -194,7 +195,7 @@ function compute(){
     bubble('BDC obtenus',nf.format(r.bdc),'ont atteint « BDC à signer »','var(--s-ce)'),
     bubble('Paiement total',nf.format(r.paiement),'étape « Paiement total »','var(--s-mandat)'),
     bubble('Attente doc CPI',nf.format(r.docs),'étape « Attente doc CPI »','#EE9A34'),
-    bubble("Taux d'annulation", r.taux==null?'—':nf1.format(r.taux)+' %', 'annulés après « À relancer » / en cours', tauxCol),
+    bubble("Taux d'annulation", r.taux==null?'—':nf1.format(r.taux)+' %', 'annulés / total ayant atteint « À relancer »', tauxCol),
     bubble('Délai moyen', r.delai==null?'—':nf.format(Math.round(r.delai))+' h', (r.delai!=null&&r.delai>24?'⚠ ':'')+ (r.retard? r.retard+' projet(s) > 24 h':'traitement à jour'), delaiCol),
   ].join('');
 }
