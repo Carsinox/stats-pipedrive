@@ -158,11 +158,10 @@ function compute(){
   const cf=(p,k)=>p.custom_fields?p.custom_fields[k]:undefined;
   const riOf=(p)=>canon.get(ftok(cf(p,riField)));
 
-  const scope=(d.projects||[]).filter(p=>{
-    if(p.status==='deleted') return false;
-    if(!riOf(p)) return false;
-    const s=parseD(p.start_date); return s && s.getTime()>=pStart;
-  }).map(p=>{
+  // Un projet OUVERT compte toujours (c'est l'état actuel du service) ;
+  // les projets terminés/annulés ne comptent que si leur date récente est dans la période.
+  const inPeriod=(p)=>{ if(p.status==='open') return true; const r=parseD(p.update_time)||parseD(p.start_date); return !r || r.getTime()>=pStart; };
+  const scope=(d.projects||[]).filter(p=> p.status!=='deleted' && riOf(p) && inPeriod(p)).map(p=>{
     const m=phMap.get(Number(p.phase_id))||{};
     return {ri:riOf(p),status:p.status,ord:m.ord!=null?m.ord:null,key:m.key||null,updMs:parseD(p.update_time)?parseD(p.update_time).getTime():null};
   });
