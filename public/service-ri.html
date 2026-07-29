@@ -53,6 +53,19 @@
   .ri-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .ri-chip{font-size:13px;font-weight:800;padding:5px 13px;border-radius:999px;background:var(--brand-soft);color:var(--brand-ink)}
   .note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.55}
+  .bubble.clickable{cursor:pointer;transition:transform .1s,box-shadow .1s}
+  .bubble.clickable:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(16,31,45,.12)}
+  .bmore{margin-top:8px;font-size:11px;font-weight:700;color:var(--brand-2)}
+  .modal-ov{position:fixed;inset:0;z-index:60;background:rgba(15,26,38,.42);display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-ov.on{display:flex}
+  .modal{background:var(--surface);border-radius:18px;max-width:520px;width:100%;max-height:80vh;display:flex;flex-direction:column;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.4);position:relative}
+  .modal h3{margin:0 30px 2px 0;font-size:17px}
+  .modal .msub{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+  .modal .close{position:absolute;top:14px;right:16px;border:none;background:transparent;font-size:24px;line-height:1;color:var(--muted);cursor:pointer}
+  .mbody{overflow:auto}
+  .mbody table{border-collapse:collapse;width:100%;font-size:13.5px}
+  .mbody td{padding:8px 6px;border-bottom:1px solid var(--grid)}
+  .mbody .empty{color:var(--muted);padding:16px;text-align:center}
   @media(max-width:900px){.g5,.g4{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -74,19 +87,7 @@
 </header>
 
 <div class="wrap">
-  <div class="controls">
-    <select id="periodSel" title="Période">
-      <option value="month">Mois en cours</option>
-      <option value="3m">3 derniers mois</option>
-      <option value="6m">6 derniers mois</option>
-      <option value="12m">12 derniers mois</option>
-    </select>
-  </div>
-
   <div id="content" style="display:none">
-    <h2>Vue globale <span class="hint">tous les RI · ne change pas avec le filtre</span></h2>
-    <div class="grid g5" id="globalGrid"></div>
-
     <h2 class="ri-head">Détail par RI
       <select id="riSel" title="Relation Garage" style="margin-left:4px"><option value="all">Tous les RI</option></select>
     </h2>
@@ -98,20 +99,28 @@
   <div class="status" id="statusBox"><span class="spin"></span>Chargement du Service RI…</div>
 </div>
 
+<div class="modal-ov" id="riModal">
+  <div class="modal">
+    <button class="close" id="riClose" title="Fermer">×</button>
+    <h3 id="riMTitle">Détail</h3>
+    <div class="msub" id="riMSub"></div>
+    <div id="riMBody" class="mbody"></div>
+  </div>
+</div>
+
 <script>
 const $=(s)=>document.querySelector(s);
 const nf=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
 const nf1=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1});
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm=(s)=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
-const state={period:'month',ri:'all',raw:null};
+const state={ri:'all',raw:null};
 
 (function(){const t=localStorage.getItem('pd_theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
 $('#themeBtn').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');const dark=c==='dark'||(c!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);const nx=dark?'light':'dark';document.documentElement.setAttribute('data-theme',nx);try{localStorage.setItem('pd_theme',nx);}catch(_){}if(state.raw)compute();};
 $('#logoutBtn').onclick=async()=>{try{await fetch('/api/logout',{method:'POST'});}catch(_){}location.href='/';};
 
 function parseD(s){ if(!s)return null; let x=String(s).trim().replace(' ','T'); if(x.length===10) x+='T00:00:00Z'; else if(!/[zZ]|[+\-]\d\d:?\d\d$/.test(x)) x+='Z'; const d=new Date(x); return isNaN(d)?null:d; }
-function periodStart(nowMs){ const d=new Date(nowMs);const back=state.period==='month'?0:state.period==='3m'?2:state.period==='6m'?5:11; return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()-back,1); }
 // Heures OUVRÉES entre deux dates : lundi→vendredi, 9h–18h (heure locale). Week-ends et hors 9-18 exclus.
 function bizHours(startMs,endMs){
   if(!(endMs>startMs)) return 0;
@@ -131,35 +140,34 @@ function bizHours(startMs,endMs){
   return total/3600000;
 }
 
-function bubble(label,value,foot,accent){
-  return `<div class="bubble" style="--accent:${accent||'var(--brand)'}"><div class="blab">${label}</div><div class="bval"${accent&&accent.startsWith('#')?` style="color:${accent}"`:''}>${value}</div><div class="bfoot">${foot||''}</div></div>`;
+// Rendu des bulles. Les bulles de comptage sont cliquables (items = liste de projets) ;
+// Taux d'annulation et Délai de réponse ne le sont pas.
+let RI_SPECS=[];
+function renderRi(specs){
+  RI_SPECS=specs;
+  $('#riGrid').innerHTML=specs.map((s,i)=>{
+    const clk=s.items!=null;
+    return `<div class="bubble${clk?' clickable':''}" data-idx="${i}" style="--accent:${s.accent}"><div class="blab">${s.label}</div>`
+      +`<div class="bval"${s.color?` style="color:${s.color}"`:''}>${s.value}</div>`
+      +(clk?'<div class="bmore">détail ›</div>':'')+`</div>`;
+  }).join('');
+  $('#riGrid').querySelectorAll('.bubble.clickable').forEach(el=>{ el.onclick=()=>openDetail(+el.dataset.idx); });
 }
-
-function metrics(list,nowMs,ph){
-  const enCours=list.filter(p=>p.status==='open');                                            // ni annulé ni terminé
-  const atOpen=(id)=>list.filter(p=>id!=null && p.pid===id && p.status==='open');             // ouverts, à l'étape courante
-  const attente=atOpen(ph.arId);   // étape "A relancer"
-  const bdc=atOpen(ph.bdcId);      // étape "BDC à signer"
-  const paiement=atOpen(ph.paieId);// étape "Paiement total"
-  const docs=atOpen(ph.cpiId);     // étape "Attente doc CPI"
-  // Taux d'annulation : projets de "À relancer" (ordre 4) à "Attente doc CPI" (ordre 16) inclus.
-  const inTaux=(p)=> ph.arIdx!=null && ph.cpiIdx!=null && p.idx!=null && p.idx>=ph.arIdx && p.idx<=ph.cpiIdx;
-  const reachedAR=list.filter(inTaux);
-  const cancelAfterAR=reachedAR.filter(p=>p.status==='canceled').length;
-  const taux=reachedAR.length>0 ? cancelAfterAR/reachedAR.length*100 : null;           // borné à 100 %
-  // Délai de réponse : projets OUVERTS de "Validation garage" (ordre 2) à "Attente doc CPI" (ordre 16).
-  const inDelai=(p)=> p.status==='open' && ph.validIdx!=null && ph.cpiIdx!=null && p.idx!=null && p.idx>=ph.validIdx && p.idx<=ph.cpiIdx;
-  const dels=list.filter(inDelai).map(p=>p.updMs?bizHours(p.updMs,nowMs):null).filter(v=>v!=null&&v>=0);
-  const delai=dels.length ? dels.reduce((a,b)=>a+b,0)/dels.length : null;
-  const retard=dels.filter(h=>h>24).length;
-  return {enCours:enCours.length,attente:attente.length,bdc:bdc.length,paiement:paiement.length,docs:docs.length,taux,delai,retard,total:list.length};
+function openDetail(i){
+  const s=RI_SPECS[i]; if(!s||!s.items) return;
+  const items=s.items.slice().sort((a,b)=>String(a.title||'').localeCompare(String(b.title||''),'fr'));
+  $('#riMTitle').textContent='Détail · '+s.label;
+  $('#riMSub').textContent=nf.format(items.length)+' projet'+(items.length>1?'s':'');
+  $('#riMBody').innerHTML=items.length ? '<table>'+items.map(x=>`<tr><td>${esc(x.title||('#'+x.id))}</td></tr>`).join('')+'</table>' : '<div class="empty">Aucun projet</div>';
+  $('#riModal').classList.add('on');
 }
+$('#riClose').onclick=()=>$('#riModal').classList.remove('on');
+$('#riModal').addEventListener('click',(e)=>{ if(e.target.id==='riModal')$('#riModal').classList.remove('on'); });
 
 function compute(){
   const d=state.raw; if(!d) return;
   const nowMs=Date.parse(d.generatedAt)||Date.now();
-  const pStart=periodStart(nowMs);
-  // Phases réelles, triées par ordre du board. On identifie les 4 étapes clés par leur nom.
+  // Phases réelles, triées par ordre du board. On identifie les étapes clés par leur nom.
   const phases=(d.phases||[]).slice().sort((a,b)=>((a.order_nr!=null?a.order_nr:0)-(b.order_nr!=null?b.order_nr:0)));
   const orderIdx=new Map(); phases.forEach((p,i)=>orderIdx.set(Number(p.id), p.order_nr!=null?Number(p.order_nr):i));
   const idxOf=(pid)=>{const v=orderIdx.get(Number(pid));return v!=null?v:null;};
@@ -169,9 +177,7 @@ function compute(){
   const bdcP = findP(n=>/bdc\s*a\s*signer/.test(n)) || findP(n=>/bdc/.test(n)&&/signer/.test(n)); // "BDC à signer"
   const paieP= findP(n=>/paiement\s*total/.test(n));                          // "Paiement total - CT OK"
   const cpiP = findP(n=>/doc\s*cpi/.test(n)) || findP(n=>/cpi/.test(n)&&/attente/.test(n));       // "Attente doc CPI" (ordre 16)
-  const ph={ arId:arP?Number(arP.id):null, arIdx:arP?idxOf(arP.id):null, bdcId:bdcP?Number(bdcP.id):null,
-    paieId:paieP?Number(paieP.id):null, cpiId:cpiP?Number(cpiP.id):null,
-    validIdx:validP?idxOf(validP.id):null, cpiIdx:cpiP?idxOf(cpiP.id):null };
+  const arIdx=arP?idxOf(arP.id):null, validIdx=validP?idxOf(validP.id):null, cpiIdx=cpiP?idxOf(cpiP.id):null;
 
   const collabs=(d.collaborators||[]);
   const ftok=(s)=>norm(s).split(/[\s\-']/)[0];        // prénom (gère « Géraldine Dupont » -> geraldine)
@@ -179,46 +185,44 @@ function compute(){
   const riField=d.riField||'relation_garage';
   const cf=(p,k)=>p.custom_fields?p.custom_fields[k]:undefined;
   const riOf=(p)=>canon.get(ftok(cf(p,riField)));
-
-  // Un projet OUVERT compte toujours (c'est l'état actuel du service) ;
-  // les projets terminés/annulés ne comptent que si leur date récente est dans la période.
-  const inPeriod=(p)=>{ if(p.status==='open') return true; const r=parseD(p.update_time)||parseD(p.start_date); return !r || r.getTime()>=pStart; };
   const tms=(p)=>{ const r=parseD(p.resp_time)||parseD(p.update_time); return r?r.getTime():null; }; // dernière "réponse"
-  const scope=(d.projects||[]).filter(p=> p.status!=='deleted' && riOf(p) && inPeriod(p)).map(p=>{
-    return {ri:riOf(p),status:p.status,pid:Number(p.phase_id),idx:idxOf(p.phase_id),updMs:tms(p)};
+
+  const all=(d.projects||[]).filter(p=> p.status!=='deleted' && riOf(p)).map(p=>{
+    return {ri:riOf(p),status:p.status,pid:Number(p.phase_id),idx:idxOf(p.phase_id),updMs:tms(p),title:p.title,id:p.id};
   });
+  const list = state.ri==='all' ? all : all.filter(p=>p.ri===state.ri);
 
-  // ---- Global (tous les RI) — fixe ----
-  const g=metrics(scope,nowMs,ph);
-  $('#globalGrid').innerHTML=[
-    bubble('Projets en cours','<b>'+nf.format(g.enCours)+'</b>','ni annulés ni terminés','var(--brand)'),
-    bubble('En attente de traitement',nf.format(g.attente),'étape « À relancer »','var(--s-r2)'),
-    bubble('BDC obtenus',nf.format(g.bdc),'à l’étape « BDC à signer »','var(--s-ce)'),
-    bubble('Paiement total',nf.format(g.paiement),'étape « Paiement total »','var(--s-mandat)'),
-    bubble('Attente doc CPI',nf.format(g.docs),'étape « Attente doc CPI »','#EE9A34'),
-  ].join('').replace(/<b>|<\/b>/g,'');
+  const atOpen=(id)=>list.filter(p=>id!=null && p.pid===id && p.status==='open'); // ouverts, à l'étape courante
+  const enCours=list.filter(p=>p.status==='open');
+  const attente=atOpen(arP?Number(arP.id):null);
+  const bdc=atOpen(bdcP?Number(bdcP.id):null);
+  const paiement=atOpen(paieP?Number(paieP.id):null);
+  const docs=atOpen(cpiP?Number(cpiP.id):null);
+  // Taux d'annulation : projets de « À relancer » à « Attente doc CPI » (bornes incluses).
+  const inTaux=(p)=> arIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=arIdx && p.idx<=cpiIdx;
+  const reached=list.filter(inTaux), taux=reached.length? reached.filter(p=>p.status==='canceled').length/reached.length*100 : null;
+  // Délai de réponse (heures ouvrées) : projets ouverts de « Validation garage » à « Attente doc CPI ».
+  const inDelai=(p)=> p.status==='open' && validIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=validIdx && p.idx<=cpiIdx;
+  const dels=list.filter(inDelai).map(p=>p.updMs?bizHours(p.updMs,nowMs):null).filter(v=>v!=null&&v>=0);
+  const delai=dels.length? dels.reduce((a,b)=>a+b,0)/dels.length : null;
+  const tauxCol = taux==null?'var(--muted)':taux>=30?'#D9534F':taux>=15?'#EE9A34':'#1F9D57';
+  const delaiCol = delai==null?'var(--muted)':delai>24?'#D9534F':'#1F9D57';
 
-  // ---- Détail RI (filtré) ----
-  const list = state.ri==='all' ? scope : scope.filter(p=>p.ri===state.ri);
-  const r=metrics(list,nowMs,ph);
-  const tauxCol = r.taux==null?'var(--muted)':r.taux>=30?'#D9534F':r.taux>=15?'#EE9A34':'#1F9D57';
-  const delaiCol = r.delai==null?'var(--muted)':r.delai>24?'#D9534F':'#1F9D57';
-  $('#riGrid').innerHTML=[
-    bubble('Projets en cours',nf.format(r.enCours),'ni annulés ni terminés','var(--brand)'),
-    bubble('En attente de traitement',nf.format(r.attente),'étape « À relancer »','var(--s-r2)'),
-    bubble('BDC obtenus',nf.format(r.bdc),'à l’étape « BDC à signer »','var(--s-ce)'),
-    bubble('Paiement total',nf.format(r.paiement),'étape « Paiement total »','var(--s-mandat)'),
-    bubble('Attente doc CPI',nf.format(r.docs),'étape « Attente doc CPI »','#EE9A34'),
-    bubble("Taux d'annulation", r.taux==null?'—':nf1.format(r.taux)+' %', 'annulés · « À relancer » → « Attente doc CPI »', tauxCol),
-    bubble('Délai de réponse', r.delai==null?'—':nf.format(Math.round(r.delai))+' h ouvrées', (r.delai!=null&&r.delai>24?'⚠ ':'')+ (r.retard? r.retard+' projet(s) > 24 h':'à jour')+' · Lun–Ven 9h–18h · Valid. garage → Doc CPI', delaiCol),
-  ].join('');
+  renderRi([
+    {label:'Projets en cours', value:nf.format(enCours.length), accent:'var(--brand)', items:enCours},
+    {label:'En attente de traitement', value:nf.format(attente.length), accent:'var(--s-r2)', items:attente},
+    {label:'BDC obtenus', value:nf.format(bdc.length), accent:'var(--s-ce)', items:bdc},
+    {label:'Paiement total', value:nf.format(paiement.length), accent:'var(--s-mandat)', items:paiement},
+    {label:'Attente doc CPI', value:nf.format(docs.length), accent:'#EE9A34', items:docs},
+    {label:"Taux d'annulation", value: taux==null?'—':nf1.format(taux)+' %', accent:tauxCol, color:tauxCol, items:null},
+    {label:'Délai de réponse', value: delai==null?'—':nf.format(Math.round(delai))+' h', accent:delaiCol, color:delaiCol, items:null},
+  ]);
 }
 
 function fillRi(d){
   const sel=$('#riSel');
   if(sel.dataset.filled!=='1'&&d.collaborators){ d.collaborators.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);}); sel.dataset.filled='1'; }
 }
-$('#periodSel').onchange=(e)=>{state.period=e.target.value;compute();};
 $('#riSel').onchange=(e)=>{state.ri=e.target.value;compute();};
 
 async function load(force){
@@ -235,7 +239,7 @@ async function load(force){
       $('#riNote').innerHTML="⚠ Aucun projet récupéré (raison : <b>"+esc(d.reason||'?')+"</b>). Ouvre <code>/api/ri?debug=1</code> et envoie le résultat pour diagnostic.";
     } else {
       $('#subline').textContent='Vos projets Pipedrive · maj '+when;
-      $('#riNote').innerHTML="Réparti par « Relation Garage ». Délai de réponse = temps <b>en heures ouvrées</b> (Lun–Ven 9h–18h, week-ends exclus) depuis le plus récent de : modification d'un champ, avancement de phase, ou note postée par le RI.";
+      $('#riNote').innerHTML="";
     }
     compute();
     $('#statusBox').style.display='none';$('#content').style.display='block';
