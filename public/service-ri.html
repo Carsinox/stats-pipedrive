@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Service RI · VPA</title>
+<style>
+  :root{
+    --brand:#859CB6; --brand-2:#6C87A4; --brand-ink:#2A3B4E; --brand-soft:#EAEFF5;
+    --page:#EEF2F7; --surface:#FFFFFF; --surface-2:#F3F6FA;
+    --text-primary:#1B2733; --text-secondary:#5C6B7A; --muted:#94A2B0;
+    --grid:#E5EBF1; --baseline:#CBD5E0; --border:rgba(42,59,78,.10);
+    --good:#1F9D57; --warn:#C77B18; --critical:#D9534F;
+    --s-ce:#4C9BE0; --s-r2:#7C6CD6; --s-mandat:#2FA37A;
+  }
+  [data-theme="dark"]{
+    --brand:#94ABC6; --brand-2:#7C97B5; --brand-ink:#0F1A26; --brand-soft:#1B2836;
+    --page:#0E141B; --surface:#172230; --surface-2:#1E2C3B;
+    --text-primary:#EAF1F8; --text-secondary:#A7B6C4; --muted:#6E7F90;
+    --grid:#223141; --baseline:#324556; --border:rgba(255,255,255,.09);
+    --good:#2CB86A; --warn:#E0A23A; --critical:#E8706B;
+    --s-ce:#5AA9EC; --s-r2:#9385E0; --s-mandat:#3EBB8E;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--page);color:var(--text-primary)}
+  .appbar{position:sticky;top:0;z-index:25;background:linear-gradient(120deg,var(--brand-ink),var(--brand-2));box-shadow:0 2px 14px rgba(0,0,0,.14)}
+  .appbar-inner{max-width:1180px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:14px}
+  .logo-img{height:40px;width:auto;flex:none;display:block}
+  .brand-title{color:#fff;font-weight:800;font-size:17px;line-height:1.1}
+  .sub{color:rgba(255,255,255,.72);font-size:12px}
+  .appbar-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .navlink{color:#fff;text-decoration:none;font-size:13.5px;font-weight:700;padding:8px 12px;border-radius:9px;background:rgba(255,255,255,.12)}
+  .navlink.ghost{background:transparent;border:1px solid rgba(255,255,255,.28)}
+  .icon-btn{background:rgba(255,255,255,.12);border:none;color:#fff;width:36px;height:36px;border-radius:9px;cursor:pointer;font-size:15px}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 18px 60px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+  select{appearance:none;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:11px 34px 11px 13px;font-size:14px;color:var(--text-primary);cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%237C8A99' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");background-repeat:no-repeat;background-position:right 12px center}
+  h2{font-size:15px;margin:22px 0 12px}
+  .hint{font-size:12.5px;color:var(--muted);font-weight:500}
+  .grid{display:grid;gap:14px}
+  .g5{grid-template-columns:repeat(5,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+  .bubble{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px 18px 16px;box-shadow:0 1px 2px rgba(16,31,45,.05);position:relative;overflow:hidden}
+  .bubble::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--accent,var(--brand))}
+  .bubble .blab{font-size:12.5px;color:var(--text-secondary);font-weight:650;line-height:1.3;min-height:32px}
+  .bubble .bval{font-size:34px;font-weight:850;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1}
+  .bubble .bfoot{font-size:11.5px;color:var(--muted);margin-top:5px}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800}
+  .demo-badge{display:none;background:#FFE9A8;color:#7A5B00;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800}
+  .status{padding:40px;text-align:center;color:var(--text-secondary)}
+  .spin{width:26px;height:26px;border:3px solid var(--grid);border-top-color:var(--brand);border-radius:50%;display:inline-block;animation:sp .8s linear infinite;vertical-align:middle;margin-right:8px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .ri-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .ri-chip{font-size:13px;font-weight:800;padding:5px 13px;border-radius:999px;background:var(--brand-soft);color:var(--brand-ink)}
+  .note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.55}
+  @media(max-width:900px){.g5,.g4{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="appbar">
+  <div class="appbar-inner">
+    <img class="logo-img" src="logo.png" alt="VPA" />
+    <div>
+      <div class="brand-title">Service RI</div>
+      <div class="sub" id="subline">Chargement…</div>
+    </div>
+    <div class="appbar-actions">
+      <span class="demo-badge" id="demoBadge">Démo</span>
+      <a class="navlink ghost" href="/">← Ventes</a>
+      <a class="navlink ghost" href="/projets.html">Projets</a>
+      <button class="icon-btn" id="refreshBtn" title="Actualiser">↻</button>
+      <button class="icon-btn" id="themeBtn" title="Thème">◐</button>
+      <button class="icon-btn" id="logoutBtn" title="Se déconnecter" style="display:none">⎋</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <select id="periodSel" title="Période">
+      <option value="month">Mois en cours</option>
+      <option value="3m">3 derniers mois</option>
+      <option value="6m">6 derniers mois</option>
+      <option value="12m">12 derniers mois</option>
+    </select>
+  </div>
+
+  <div id="content" style="display:none">
+    <h2>Vue globale <span class="hint">tous les RI · ne change pas avec le filtre</span></h2>
+    <div class="grid g5" id="globalGrid"></div>
+
+    <h2 class="ri-head">Détail par RI
+      <select id="riSel" title="Relation Garage" style="margin-left:4px"><option value="all">Tous les RI</option></select>
+    </h2>
+    <div class="grid g4" id="riGrid"></div>
+
+    <div class="note" id="riNote"></div>
+  </div>
+
+  <div class="status" id="statusBox"><span class="spin"></span>Chargement du Service RI…</div>
+</div>
+
+<script>
+const $=(s)=>document.querySelector(s);
+const nf=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
+const nf1=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1});
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=(s)=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+const state={period:'month',ri:'all',raw:null};
+
+(function(){const t=localStorage.getItem('pd_theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
+$('#themeBtn').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');const dark=c==='dark'||(c!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);const nx=dark?'light':'dark';document.documentElement.setAttribute('data-theme',nx);try{localStorage.setItem('pd_theme',nx);}catch(_){}if(state.raw)compute();};
+$('#logoutBtn').onclick=async()=>{try{await fetch('/api/logout',{method:'POST'});}catch(_){}location.href='/';};
+
+const ORD={attente_attribution:0,validation_garage:1,a_relancer:2,controle1:3,bdc:4,docs_cpi:5,tuv:6,paiement:7};
+function stepKey(name){
+  const n=norm(name);
+  if(/tuv/.test(n)) return 'tuv';
+  if(/paiement/.test(n)) return 'paiement';
+  if(/cpi/.test(n)) return 'docs_cpi';
+  if(/bdc/.test(n)) return 'bdc';
+  if(/contr.?le?\s*1|ctrl\s*1/.test(n)) return 'controle1';
+  if(/a\s*relancer|relancer/.test(n)) return 'a_relancer';
+  if(/validation|garage/.test(n)) return 'validation_garage';
+  if(/attribution|attente/.test(n)) return 'attente_attribution';
+  return null;
+}
+function parseD(s){ if(!s)return null; const d=new Date(String(s).length===10?s+'T00:00:00Z':s); return isNaN(d)?null:d; }
+function periodStart(nowMs){ const d=new Date(nowMs);const back=state.period==='month'?0:state.period==='3m'?2:state.period==='6m'?5:11; return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()-back,1); }
+
+function bubble(label,value,foot,accent){
+  return `<div class="bubble" style="--accent:${accent||'var(--brand)'}"><div class="blab">${label}</div><div class="bval"${accent&&accent.startsWith('#')?` style="color:${accent}"`:''}>${value}</div><div class="bfoot">${foot||''}</div></div>`;
+}
+
+function metrics(list,nowMs){
+  const enCours=list.filter(p=>p.status!=='canceled'&&p.status!=='completed'&&p.status!=='deleted');
+  const attente=list.filter(p=>p.key==='a_relancer');
+  const bdc=list.filter(p=>p.status!=='deleted'&&p.ord!=null&&p.ord>=ORD.bdc);           // a atteint BDC à signer
+  const paiement=list.filter(p=>p.key==='paiement');                                      // actuellement en Paiement total
+  const docs=list.filter(p=>p.key==='docs_cpi');                                          // actuellement en Attente doc CPI
+  const cancelAfterAR=list.filter(p=>p.status==='canceled'&&p.ord!=null&&p.ord>=ORD.a_relancer).length;
+  const taux=enCours.length>0 ? cancelAfterAR/enCours.length*100 : null;
+  const dels=enCours.map(p=>p.updMs?(nowMs-p.updMs)/3600000:null).filter(v=>v!=null&&v>=0);
+  const delai=dels.length ? dels.reduce((a,b)=>a+b,0)/dels.length : null;
+  const retard=dels.filter(h=>h>24).length;
+  return {enCours:enCours.length,attente:attente.length,bdc:bdc.length,paiement:paiement.length,docs:docs.length,taux,delai,retard,total:list.length};
+}
+
+function compute(){
+  const d=state.raw; if(!d) return;
+  const nowMs=Date.parse(d.generatedAt)||Date.now();
+  const pStart=periodStart(nowMs);
+  const phMap=new Map();(d.phases||[]).forEach(p=>{const k=stepKey(p.name);phMap.set(Number(p.id),{key:k,ord:k?ORD[k]:null});});
+  const collabs=(d.collaborators||[]);
+  const canon=new Map(collabs.map(c=>[norm(c),c]));
+  const riField=d.riField||'relation_garage';
+  const cf=(p,k)=>p.custom_fields?p.custom_fields[k]:undefined;
+
+  const scope=(d.projects||[]).filter(p=>{
+    if(p.status==='deleted') return false;
+    if(!canon.get(norm(cf(p,riField)))) return false;
+    const s=parseD(p.start_date); return s && s.getTime()>=pStart;
+  }).map(p=>{
+    const m=phMap.get(Number(p.phase_id))||{};
+    return {ri:canon.get(norm(cf(p,riField))),status:p.status,ord:m.ord!=null?m.ord:null,key:m.key||null,updMs:parseD(p.update_time)?parseD(p.update_time).getTime():null};
+  });
+
+  // ---- Global (tous les RI) — fixe ----
+  const g=metrics(scope,nowMs);
+  $('#globalGrid').innerHTML=[
+    bubble('Projets en cours','<b>'+nf.format(g.enCours)+'</b>','ni annulés ni terminés','var(--brand)'),
+    bubble('En attente de traitement',nf.format(g.attente),'étape « À relancer »','var(--s-r2)'),
+    bubble('BDC obtenus',nf.format(g.bdc),'ont atteint « BDC à signer »','var(--s-ce)'),
+    bubble('Paiement total',nf.format(g.paiement),'étape « Paiement total »','var(--s-mandat)'),
+    bubble('Attente doc CPI',nf.format(g.docs),'étape « Attente doc CPI »','#EE9A34'),
+  ].join('').replace(/<b>|<\/b>/g,'');
+
+  // ---- Détail RI (filtré) ----
+  const list = state.ri==='all' ? scope : scope.filter(p=>p.ri===state.ri);
+  const r=metrics(list,nowMs);
+  const tauxCol = r.taux==null?'var(--muted)':r.taux>=30?'#D9534F':r.taux>=15?'#EE9A34':'#1F9D57';
+  const delaiCol = r.delai==null?'var(--muted)':r.delai>24?'#D9534F':'#1F9D57';
+  $('#riGrid').innerHTML=[
+    bubble('Projets en cours',nf.format(r.enCours),'ni annulés ni terminés','var(--brand)'),
+    bubble('En attente de traitement',nf.format(r.attente),'étape « À relancer »','var(--s-r2)'),
+    bubble('BDC obtenus',nf.format(r.bdc),'ont atteint « BDC à signer »','var(--s-ce)'),
+    bubble('Paiement total',nf.format(r.paiement),'étape « Paiement total »','var(--s-mandat)'),
+    bubble('Attente doc CPI',nf.format(r.docs),'étape « Attente doc CPI »','#EE9A34'),
+    bubble("Taux d'annulation", r.taux==null?'—':nf1.format(r.taux)+' %', 'annulés après « À relancer » / en cours', tauxCol),
+    bubble('Délai moyen', r.delai==null?'—':nf.format(Math.round(r.delai))+' h', (r.delai!=null&&r.delai>24?'⚠ ':'')+ (r.retard? r.retard+' projet(s) > 24 h':'traitement à jour'), delaiCol),
+  ].join('');
+}
+
+function fillRi(d){
+  const sel=$('#riSel');
+  if(sel.dataset.filled!=='1'&&d.collaborators){ d.collaborators.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);}); sel.dataset.filled='1'; }
+}
+$('#periodSel').onchange=(e)=>{state.period=e.target.value;compute();};
+$('#riSel').onchange=(e)=>{state.ri=e.target.value;compute();};
+
+async function load(force){
+  $('#refreshBtn').classList.add('spin');
+  try{
+    const r=await fetch('/api/ri'+(force?('?fresh='+Date.now()):''),{cache:'no-store'});
+    if(r.status===401){ location.href='/'; return; }
+    const d=await r.json();
+    if(d.error) throw new Error(d.message||'Erreur');
+    state.raw=d; fillRi(d);
+    $('#demoBadge').style.display=d.demo?'inline-block':'none';
+    const when=new Date(d.generatedAt).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
+    $('#subline').textContent=(d.demo?'Aperçu (données simulées)':'Vos projets Pipedrive')+' · maj '+when;
+    $('#riNote').innerHTML = d.demo
+      ? "⚠ Mode démo. Un seul prérequis pour vos vraies données (aucune automatisation) : indiquer la clé du champ « Relation Garage » dans la variable PIPEDRIVE_RI_FIELD."
+      : "Réparti par « Relation Garage », sans automatisation : tout est calculé sur l'étape actuelle, le statut et la dernière mise à jour du projet.";
+    compute();
+    $('#statusBox').style.display='none';$('#content').style.display='block';
+  }catch(e){ $('#statusBox').innerHTML='⚠ '+esc(e.message); }
+  finally{ $('#refreshBtn').classList.remove('spin'); }
+}
+$('#refreshBtn').onclick=()=>load(true);
+fetch('/api/session',{cache:'no-store'}).then(r=>r.json()).then(s=>{ if(s.required) $('#logoutBtn').style.display=''; }).catch(()=>{});
+load();
+</script>
+</body>
+</html>
