@@ -225,6 +225,7 @@ module.exports = async (req, res) => {
       board_id: idOf(p.board_id != null ? p.board_id : p.pipeline_id),
       start_date: p.start_date || null, end_date: p.end_date || null,
       update_time: p.update_time || p.status_change_time || p.updated || null,
+      status_change_time: p.status_change_time || null, // date du dernier changement de statut (annulation)
       // Date de dernière "réponse" (max des 3 signaux) — utilisée pour le délai de réponse.
       resp_time: respMs ? new Date(respMs).toISOString() : (p.update_time || null),
       custom_fields: { relation_garage: riLabel(cf(p, riField)) },

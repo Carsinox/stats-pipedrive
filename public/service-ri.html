@@ -149,6 +149,7 @@ function renderRi(specs){
     const clk=s.items!=null;
     return `<div class="bubble${clk?' clickable':''}" data-idx="${i}" style="--accent:${s.accent}"><div class="blab">${s.label}</div>`
       +`<div class="bval"${s.color?` style="color:${s.color}"`:''}>${s.value}</div>`
+      +(s.foot?`<div class="bfoot">${s.foot}</div>`:'')
       +(clk?'<div class="bmore">détail ›</div>':'')+`</div>`;
   }).join('');
   $('#riGrid').querySelectorAll('.bubble.clickable').forEach(el=>{ el.onclick=()=>openDetail(+el.dataset.idx); });
@@ -187,8 +188,10 @@ function compute(){
   const riOf=(p)=>canon.get(ftok(cf(p,riField)));
   const tms=(p)=>{ const r=parseD(p.resp_time)||parseD(p.update_time); return r?r.getTime():null; }; // dernière "réponse"
 
-  const all=(d.projects||[]).filter(p=> p.status!=='deleted' && riOf(p)).map(p=>{
-    return {ri:riOf(p),status:p.status,pid:Number(p.phase_id),idx:idxOf(p.phase_id),updMs:tms(p),title:p.title,id:p.id};
+  // Les projets terminés (completed) et supprimés ne comptent jamais dans les stats.
+  const scMs=(p)=>{ const r=parseD(p.status_change_time); return r?r.getTime():null; };
+  const all=(d.projects||[]).filter(p=> p.status!=='deleted' && p.status!=='completed' && riOf(p)).map(p=>{
+    return {ri:riOf(p),status:p.status,pid:Number(p.phase_id),idx:idxOf(p.phase_id),updMs:tms(p),scMs:scMs(p),title:p.title,id:p.id};
   });
   const list = state.ri==='all' ? all : all.filter(p=>p.ri===state.ri);
 
@@ -198,9 +201,16 @@ function compute(){
   const bdc=atOpen(bdcP?Number(bdcP.id):null);
   const paiement=atOpen(paieP?Number(paieP.id):null);
   const docs=atOpen(cpiP?Number(cpiP.id):null);
-  // Taux d'annulation : projets de « À relancer » à « Attente doc CPI » (bornes incluses).
-  const inTaux=(p)=> arIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=arIdx && p.idx<=cpiIdx;
-  const reached=list.filter(inTaux), taux=reached.length? reached.filter(p=>p.status==='canceled').length/reached.length*100 : null;
+  // Taux d'annulation :
+  //   Numérateur   = annulés PENDANT LE MOIS EN COURS, dans « À relancer » → « Attente doc CPI ».
+  //   Dénominateur = projets OUVERTS à partir de « À relancer » jusqu'à la fin (phase ≥ À relancer).
+  //   Remise à zéro le 1er du mois.
+  const mkey=(ms)=>{ if(ms==null) return null; const d=new Date(ms); return d.getFullYear()+'-'+d.getMonth(); };
+  const curM=mkey(nowMs);
+  const inRange=(p)=> arIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=arIdx && p.idx<=cpiIdx;
+  const annulMois=list.filter(p=> p.status==='canceled' && inRange(p) && mkey(p.scMs)===curM).length;
+  const ouvertsAR=list.filter(p=> p.status==='open' && arIdx!=null && p.idx!=null && p.idx>=arIdx).length;
+  const taux= ouvertsAR>0 ? annulMois/ouvertsAR*100 : null;
   // Délai de réponse (heures ouvrées) : projets ouverts de « Validation garage » à « Attente doc CPI ».
   const inDelai=(p)=> p.status==='open' && validIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=validIdx && p.idx<=cpiIdx;
   const dels=list.filter(inDelai).map(p=>p.updMs?bizHours(p.updMs,nowMs):null).filter(v=>v!=null&&v>=0);
@@ -214,7 +224,7 @@ function compute(){
     {label:'BDC obtenus', value:nf.format(bdc.length), accent:'var(--s-ce)', items:bdc},
     {label:'Paiement total', value:nf.format(paiement.length), accent:'var(--s-mandat)', items:paiement},
     {label:'Attente doc CPI', value:nf.format(docs.length), accent:'#EE9A34', items:docs},
-    {label:"Taux d'annulation", value: taux==null?'—':nf1.format(taux)+' %', accent:tauxCol, color:tauxCol, items:null},
+    {label:"Taux d'annulation", value: taux==null?'—':nf1.format(taux)+' %', accent:tauxCol, color:tauxCol, items:null, foot:'🔄 remis à zéro le 1er du mois'},
     {label:'Délai de réponse', value: delai==null?'—':nf.format(Math.round(delai))+' h', accent:delaiCol, color:delaiCol, items:null},
   ]);
 }
