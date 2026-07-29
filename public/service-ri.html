@@ -130,13 +130,13 @@ function bubble(label,value,foot,accent){
   return `<div class="bubble" style="--accent:${accent||'var(--brand)'}"><div class="blab">${label}</div><div class="bval"${accent&&accent.startsWith('#')?` style="color:${accent}"`:''}>${value}</div><div class="bfoot">${foot||''}</div></div>`;
 }
 
-function metrics(list,nowMs){
+function metrics(list,nowMs,ph){
   const enCours=list.filter(p=>p.status!=='canceled'&&p.status!=='completed'&&p.status!=='deleted');
-  const attente=list.filter(p=>p.key==='a_relancer');
-  const bdc=list.filter(p=>p.status!=='deleted'&&p.ord!=null&&p.ord>=ORD.bdc);           // a atteint BDC à signer
-  const paiement=list.filter(p=>p.key==='paiement');                                      // actuellement en Paiement total
-  const docs=list.filter(p=>p.key==='docs_cpi');                                          // actuellement en Attente doc CPI
-  const cancelAfterAR=list.filter(p=>p.status==='canceled'&&p.ord!=null&&p.ord>=ORD.a_relancer).length;
+  const attente=list.filter(p=>ph.arId!=null && p.pid===ph.arId && p.status==='open');       // étape "A relancer"
+  const bdc=list.filter(p=>ph.bdcIdx!=null && p.idx!=null && p.idx>=ph.bdcIdx);               // a atteint "BDC à signer"
+  const paiement=list.filter(p=>ph.paieId!=null && p.pid===ph.paieId);                        // étape "Paiement total"
+  const docs=list.filter(p=>ph.cpiId!=null && p.pid===ph.cpiId);                              // étape "Attente doc CPI"
+  const cancelAfterAR=list.filter(p=>p.status==='canceled' && ph.arIdx!=null && p.idx!=null && p.idx>=ph.arIdx).length;
   const taux=enCours.length>0 ? cancelAfterAR/enCours.length*100 : null;
   const dels=enCours.map(p=>p.updMs?(nowMs-p.updMs)/3600000:null).filter(v=>v!=null&&v>=0);
   const delai=dels.length ? dels.reduce((a,b)=>a+b,0)/dels.length : null;
@@ -148,23 +148,33 @@ function compute(){
   const d=state.raw; if(!d) return;
   const nowMs=Date.parse(d.generatedAt)||Date.now();
   const pStart=periodStart(nowMs);
-  const phMap=new Map();(d.phases||[]).forEach(p=>{const k=stepKey(p.name);phMap.set(Number(p.id),{key:k,ord:k?ORD[k]:null});});
+  // Phases réelles, triées par ordre du board. On identifie les 4 étapes clés par leur nom.
+  const phases=(d.phases||[]).slice().sort((a,b)=>((a.order_nr!=null?a.order_nr:0)-(b.order_nr!=null?b.order_nr:0)));
+  const orderIdx=new Map(); phases.forEach((p,i)=>orderIdx.set(Number(p.id), p.order_nr!=null?Number(p.order_nr):i));
+  const idxOf=(pid)=>{const v=orderIdx.get(Number(pid));return v!=null?v:null;};
+  const findP=(t)=>phases.find(p=>t(norm(p.name)));
+  const arP  = findP(n=>/relancer/.test(n)&&!/tuv/.test(n));                 // "A relancer - attente infos"
+  const bdcP = findP(n=>/bdc\s*a\s*signer/.test(n)) || findP(n=>/bdc/.test(n)&&/signer/.test(n)); // "BDC à signer"
+  const paieP= findP(n=>/paiement\s*total/.test(n));                          // "Paiement total - CT OK"
+  const cpiP = findP(n=>/doc\s*cpi/.test(n)) || findP(n=>/cpi/.test(n)&&/attente/.test(n));       // "Attente doc CPI"
+  const ph={ arId:arP?Number(arP.id):null, arIdx:arP?idxOf(arP.id):null, bdcIdx:bdcP?idxOf(bdcP.id):null, paieId:paieP?Number(paieP.id):null, cpiId:cpiP?Number(cpiP.id):null };
+
   const collabs=(d.collaborators||[]);
-  const canon=new Map(collabs.map(c=>[norm(c),c]));   // correspondance par nom exact
+  const ftok=(s)=>norm(s).split(/[\s\-']/)[0];        // prénom (gère « Géraldine Dupont » -> geraldine)
+  const canon=new Map(collabs.map(c=>[ftok(c),c]));
   const riField=d.riField||'relation_garage';
   const cf=(p,k)=>p.custom_fields?p.custom_fields[k]:undefined;
-  const riOf=(p)=>canon.get(norm(cf(p,riField)));
+  const riOf=(p)=>canon.get(ftok(cf(p,riField)));
 
   // Un projet OUVERT compte toujours (c'est l'état actuel du service) ;
   // les projets terminés/annulés ne comptent que si leur date récente est dans la période.
   const inPeriod=(p)=>{ if(p.status==='open') return true; const r=parseD(p.update_time)||parseD(p.start_date); return !r || r.getTime()>=pStart; };
   const scope=(d.projects||[]).filter(p=> p.status!=='deleted' && riOf(p) && inPeriod(p)).map(p=>{
-    const m=phMap.get(Number(p.phase_id))||{};
-    return {ri:riOf(p),status:p.status,ord:m.ord!=null?m.ord:null,key:m.key||null,updMs:parseD(p.update_time)?parseD(p.update_time).getTime():null};
+    return {ri:riOf(p),status:p.status,pid:Number(p.phase_id),idx:idxOf(p.phase_id),updMs:parseD(p.update_time)?parseD(p.update_time).getTime():null};
   });
 
   // ---- Global (tous les RI) — fixe ----
-  const g=metrics(scope,nowMs);
+  const g=metrics(scope,nowMs,ph);
   $('#globalGrid').innerHTML=[
     bubble('Projets en cours','<b>'+nf.format(g.enCours)+'</b>','ni annulés ni terminés','var(--brand)'),
     bubble('En attente de traitement',nf.format(g.attente),'étape « À relancer »','var(--s-r2)'),
@@ -175,7 +185,7 @@ function compute(){
 
   // ---- Détail RI (filtré) ----
   const list = state.ri==='all' ? scope : scope.filter(p=>p.ri===state.ri);
-  const r=metrics(list,nowMs);
+  const r=metrics(list,nowMs,ph);
   const tauxCol = r.taux==null?'var(--muted)':r.taux>=30?'#D9534F':r.taux>=15?'#EE9A34':'#1F9D57';
   const delaiCol = r.delai==null?'var(--muted)':r.delai>24?'#D9534F':'#1F9D57';
   $('#riGrid').innerHTML=[

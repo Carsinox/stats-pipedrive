@@ -76,7 +76,7 @@ module.exports = async (req, res) => {
   for (const bd of boards) {
     try {
       const ph = await pdGetAllV1('/projects/phases', { board_id: bd.id });
-      if (Array.isArray(ph)) phasesRaw = phasesRaw.concat(ph.map((x) => ({ id: x.id, name: x.name, board_id: bd.id })));
+      if (Array.isArray(ph)) phasesRaw = phasesRaw.concat(ph.map((x) => ({ id: x.id, name: x.name, board_id: bd.id, order_nr: x.order_nr })));
     } catch (e) { errs['phases:board:' + bd.id] = String((e && e.message) || e); }
   }
   const endpointsUsed = { projects: projRes.used, boards: boardRes.used, boardsCount: boards.length };
@@ -107,6 +107,9 @@ module.exports = async (req, res) => {
     const raw = Array.isArray(projectsRaw) ? projectsRaw : [];
     const sample = raw[0] || {};
     const riMapped = raw.map((p) => riLabel(cf(p, riField)));
+    const ftok = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[\s\-']/)[0];
+    const riToks = new Set(riMapped.map(ftok));
+    const matched6 = RI_COLLABS.filter((c) => riToks.has(ftok(c)));
     res.setHeader('Cache-Control', 'no-store');
     res.statusCode = 200;
     res.end(JSON.stringify({
@@ -114,12 +117,13 @@ module.exports = async (req, res) => {
       endpointsUsed,
       errors: errs,
       counts: { projects: raw.length, phases: (phasesRaw || []).length, projectFields: defs.length, users: (users || []).length },
-      phaseNames: (phasesRaw || []).map((p) => ({ id: p.id, name: p.name })),
+      phaseNames: (phasesRaw || []).map((p) => ({ id: p.id, name: p.name, order_nr: p.order_nr })),
       sampleProjectKeys: Object.keys(sample),
       sampleProject: { status: sample.status, stage_id: sample.stage_id, phase_id: sample.phase_id, update_time: sample.update_time, ri_raw: cf(sample, riField), ri_mapped: riLabel(cf(sample, riField)) },
       distinctStageIds: [...new Set(raw.map((p) => idOf(p.stage_id != null ? p.stage_id : p.phase_id)))].slice(0, 30),
-      distinctRiValues: [...new Set(riMapped)].slice(0, 40),
+      distinctRiValues: [...new Set(riMapped)].slice(0, 60),
       collaborators: RI_COLLABS,
+      matched6_dansLesDonnees: matched6,
     }, null, 2));
     return;
   }
@@ -148,10 +152,10 @@ module.exports = async (req, res) => {
   res.end(JSON.stringify({
     demo: false, generatedAt: new Date(nowMs).toISOString(),
     projects,
-    phases: (phasesRaw || []).map((p) => ({ id: p.id, name: p.name })),
+    phases: (phasesRaw || []).map((p) => ({ id: p.id, name: p.name, order_nr: p.order_nr })),
     boards: (boards || []).map((b) => ({ id: b.id, name: b.name })),
-    collaborators: foundRIs,          // RI réellement présents
-    knownCollabs: RI_COLLABS,         // les 6 souhaités (info)
+    collaborators: RI_COLLABS,        // on garde uniquement les 6 RI
+    foundRIs,                         // tous les RI présents dans les données (info)
     riField: 'relation_garage',       // clé sous laquelle la valeur est exposée à la page
     riSource: riField,                // clé Pipedrive réelle (info)
   }));
