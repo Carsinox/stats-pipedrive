@@ -7,7 +7,7 @@
 //
 // Diagnostic : ouvrir /api/ri?debug=1 (connecté) pour voir les compteurs, phases, valeurs RI et erreurs.
 
-const { getConfig, pdGetAll, pdGet } = require('./_pipedrive');
+const { getConfig, pdGetAll, pdGetAllV1, pdGet } = require('./_pipedrive');
 const { isAuthed, authRequired } = require('./_auth');
 const { buildRiDemo, RI_COLLABS } = require('./_ri');
 
@@ -47,13 +47,33 @@ module.exports = async (req, res) => {
   // Récupération avec capture d'erreur par appel (pour le diagnostic).
   const errs = {};
   const safe = (label, promise) => promise.then((v) => v).catch((e) => { errs[label] = String((e && e.message) || e); return null; });
+  // Essaie plusieurs chemins et garde le premier qui renvoie un tableau (les projets/phases
+  // ne sont pas au même endroit selon les comptes : liste en v1, détail en v2).
+  const firstOk = async (label, candidates) => {
+    for (const c of candidates) {
+      try { const v = await c.fn(); if (Array.isArray(v)) return { v, used: c.label }; }
+      catch (e) { errs[label + ':' + c.label] = String((e && e.message) || e); }
+    }
+    return { v: [], used: null };
+  };
 
-  const [projectsRaw, phasesRaw, fieldDefs, users] = await Promise.all([
-    safe('projects', pdGetAll('/projects')),
-    safe('phases', pdGetAll('/projects/phases')),
+  const [projRes, phaseRes, fieldDefs, users] = await Promise.all([
+    firstOk('projects', [
+      { label: 'v1 /projects', fn: () => pdGetAllV1('/projects') },
+      { label: 'v2 /projects', fn: () => pdGetAll('/projects') },
+    ]),
+    firstOk('phases', [
+      { label: 'v1 /projects/phases', fn: () => pdGetAllV1('/projects/phases') },
+      { label: 'v1 /projectPhases', fn: () => pdGetAllV1('/projectPhases') },
+      { label: 'v2 /projects/phases', fn: () => pdGetAll('/projects/phases') },
+      { label: 'v1 /projects/boards', fn: () => pdGetAllV1('/projects/boards') },
+    ]),
     safe('projectFields', pdGetAll('/projectFields')),
     safe('users', pdGet('/users', {}, 'v1').then((r) => r.data || [])),
   ]);
+  const projectsRaw = projRes.v;
+  const phasesRaw = phaseRes.v;
+  const endpointsUsed = { projects: projRes.used, phases: phaseRes.used };
 
   // Auto-détection du champ RI si la clé n'est pas dans les définitions récupérées.
   const defs = fieldDefs || [];
@@ -85,6 +105,7 @@ module.exports = async (req, res) => {
     res.statusCode = 200;
     res.end(JSON.stringify({
       debug: true, riField,
+      endpointsUsed,
       errors: errs,
       counts: { projects: raw.length, phases: (phasesRaw || []).length, projectFields: defs.length, users: (users || []).length },
       phaseNames: (phasesRaw || []).map((p) => ({ id: p.id, name: p.name })),
