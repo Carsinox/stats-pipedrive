@@ -126,6 +126,23 @@ module.exports = async (req, res) => {
     const parseT = (s) => { if (!s) return null; const d = new Date(String(s).replace(' ', 'T')); return isNaN(d) ? null : d.getTime(); };
     const range = (arr) => { const a = arr.filter((v) => v != null); return a.length ? { min: new Date(Math.min(...a)).toISOString().slice(0, 10), max: new Date(Math.max(...a)).toISOString().slice(0, 10) } : null; };
     const dateRange = { add_time: range(raw.map((p) => parseT(p.add_time))), update_time: range(raw.map((p) => parseT(p.update_time))) };
+    // Sonde NOTES : structure et rattachement (note -> projet ?) pour le "délai de réponse".
+    let notesProbe = null;
+    for (const attempt of [
+      { label: 'v1 /notes', fn: () => pdGet('/notes', { limit: 15, sort: 'add_time DESC' }, 'v1') },
+      { label: 'v2 /notes', fn: () => pdGet('/notes', { limit: 15 }, 'v2') },
+    ]) {
+      try {
+        const nr = await attempt.fn();
+        const notes = (nr && nr.data) || [];
+        notesProbe = {
+          used: attempt.label, count: notes.length,
+          firstKeys: notes[0] ? Object.keys(notes[0]) : [],
+          echantillon: notes.slice(0, 8).map((n) => ({ id: n.id, add_time: n.add_time, update_time: n.update_time, project_id: n.project_id, deal_id: n.deal_id, lead_id: n.lead_id, person_id: n.person_id, org_id: n.org_id, user_id: n.user_id })),
+        };
+        break;
+      } catch (e) { errs['notes:' + attempt.label] = String((e && e.message) || e); }
+    }
     res.setHeader('Cache-Control', 'no-store');
     res.statusCode = 200;
     res.end(JSON.stringify({
@@ -141,6 +158,7 @@ module.exports = async (req, res) => {
       distinctRiValues: [...new Set(riMapped)].slice(0, 60),
       collaborators: RI_COLLABS,
       matched6_dansLesDonnees: matched6,
+      notesProbe,
     }, null, 2));
     return;
   }
