@@ -152,17 +152,19 @@ function compute(){
   const pStart=periodStart(nowMs);
   const phMap=new Map();(d.phases||[]).forEach(p=>{const k=stepKey(p.name);phMap.set(Number(p.id),{key:k,ord:k?ORD[k]:null});});
   const collabs=(d.collaborators||[]);
-  const canon=new Map(collabs.map(c=>[norm(c),c]));
+  const ftok=(s)=>norm(s).split(/[\s\-']/)[0];        // premier prénom, sans accent
+  const canon=new Map(collabs.map(c=>[ftok(c),c]));
   const riField=d.riField||'relation_garage';
   const cf=(p,k)=>p.custom_fields?p.custom_fields[k]:undefined;
+  const riOf=(p)=>canon.get(ftok(cf(p,riField)));
 
   const scope=(d.projects||[]).filter(p=>{
     if(p.status==='deleted') return false;
-    if(!canon.get(norm(cf(p,riField)))) return false;
+    if(!riOf(p)) return false;
     const s=parseD(p.start_date); return s && s.getTime()>=pStart;
   }).map(p=>{
     const m=phMap.get(Number(p.phase_id))||{};
-    return {ri:canon.get(norm(cf(p,riField))),status:p.status,ord:m.ord!=null?m.ord:null,key:m.key||null,updMs:parseD(p.update_time)?parseD(p.update_time).getTime():null};
+    return {ri:riOf(p),status:p.status,ord:m.ord!=null?m.ord:null,key:m.key||null,updMs:parseD(p.update_time)?parseD(p.update_time).getTime():null};
   });
 
   // ---- Global (tous les RI) — fixe ----

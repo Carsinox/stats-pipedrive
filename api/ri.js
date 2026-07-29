@@ -52,22 +52,28 @@ module.exports = async (req, res) => {
     };
     const keys = [riField, dateFields.bdc, dateFields.arelancer, dateFields.ctrl1, dateFields.paiement].filter(Boolean);
 
-    const [projectsRaw, phasesRaw, fieldDefs] = await Promise.all([
+    const [projectsRaw, phasesRaw, fieldDefs, users] = await Promise.all([
       pdGetAll('/projects'),
       pdGetAll('/projects/phases').catch(() => []),
-      pdGet('/projectFields', {}, 'v1').then((r) => r.data || []).catch(() => []),
+      pdGetAll('/projectFields').catch(() => []),                 // v2 : GET /api/v2/projectFields
+      pdGet('/users', {}, 'v1').then((r) => r.data || []).catch(() => []),
     ]);
     if (!Array.isArray(projectsRaw) || !projectsRaw.length) return sendDemo('no_projects');
 
-    // Table de correspondance option_id -> libellé pour le champ "Relation Garage" (si champ à choix).
-    const riDef = (fieldDefs || []).find((f) => f.key === riField);
+    // Correspondance valeur -> libellé du champ "Relation Garage".
+    // Gère : liste à choix (option id -> label), champ utilisateur (user id -> nom), objet, texte brut.
+    const riDef = (fieldDefs || []).find((f) => (f.field_code || f.key) === riField);
     const optLabel = new Map();
-    if (riDef && Array.isArray(riDef.options)) riDef.options.forEach((o) => optLabel.set(String(o.id), o.label));
+    if (riDef && Array.isArray(riDef.options)) riDef.options.forEach((o) => optLabel.set(String(o.id), o.label != null ? o.label : o.name));
+    const userName = new Map((users || []).map((u) => [String(u.id), u.name]));
     const riLabel = (v) => {
       if (v == null) return null;
-      if (typeof v === 'object') v = v.id != null ? v.id : v.value;
-      const byId = optLabel.get(String(v));
-      return byId != null ? byId : String(v);
+      if (Array.isArray(v)) v = v[0];
+      if (v != null && typeof v === 'object') v = v.label != null ? v.label : (v.name != null ? v.name : (v.id != null ? v.id : v.value));
+      const s = String(v);
+      if (optLabel.has(s)) return optLabel.get(s);
+      if (userName.has(s)) return userName.get(s);
+      return s;
     };
 
     const projects = projectsRaw.map((p) => {
@@ -79,9 +85,12 @@ module.exports = async (req, res) => {
       if (dateFields.paiement) c.date_paiement = cf(p, dateFields.paiement) || null;
       return {
         id: p.id, title: p.title, deal_ids: p.deal_ids || [],
-        status: p.status, phase_id: idOf(p.phase_id), board_id: idOf(p.board_id),
+        status: p.status,
+        // La phase du projet est dans "stage_id" (type projects_phase), pas "phase_id".
+        phase_id: idOf(p.stage_id != null ? p.stage_id : p.phase_id),
+        board_id: idOf(p.pipeline_id != null ? p.pipeline_id : p.board_id),
         start_date: p.start_date || null, end_date: p.end_date || null,
-        update_time: p.update_time || p.updated || null,
+        update_time: p.update_time || p.status_change_time || p.updated || null,
         custom_fields: c,
       };
     });

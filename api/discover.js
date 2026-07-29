@@ -88,10 +88,12 @@ module.exports = async (req, res) => {
       pdGetAllV1('/personFields').catch(() => []),
       pdGetAllV1('/activityFields').catch(() => []),
       pdGet('/activityTypes', {}, 'v1').then((r) => r.data).catch(() => []),
-      pdGetAllV1('/projectFields').catch(() => []), // champs du module Projects (Service RI)
+      pdGetAll('/projectFields').catch(() => []), // v2 : GET /api/v2/projectFields
     ]);
+    // Normalise le format v2 (field_code/field_name) vers key/name pour l'affichage.
+    const projFields = (projectFields || []).map((f) => ({ key: f.field_code || f.key, name: f.field_name || f.name, field_type: f.field_type, options: f.options }));
     // --- détection du champ "Relation Garage" (champ de PROJET) ---
-    const guessRI = (projectFields || []).find((f) => /relation\s*garage|garage/i.test(f.name || ''));
+    const guessRI = projFields.find((f) => /relation\s*garage|garage/i.test(f.name || ''));
 
     const dateFields = (dealFields || []).filter((f) => ['date', 'daterange'].includes(f.field_type));
 
@@ -140,8 +142,8 @@ PIPEDRIVE_RI_FIELD=${guessRI ? guessRI.key : 'REMPLACER (voir « Champs de PROJE
       <h2>Champs de PROJET <span class="pill">PIPEDRIVE_RI_FIELD (Service RI)</span></h2>
       <div class="card">
         <p class="muted" style="margin-top:0">Repérez le champ « Relation Garage » et copiez sa <b>clé</b> dans <code>PIPEDRIVE_RI_FIELD</code>. Aucune automatisation nécessaire.</p>
-        ${(projectFields && projectFields.length) ? `<table><tr><th>Clé (key)</th><th>Nom</th><th>Type</th></tr>
-          ${rows(projectFields, [
+        ${(projFields && projFields.length) ? `<table><tr><th>Clé (key)</th><th>Nom</th><th>Type</th></tr>
+          ${rows(projFields, [
             (f) => `<span class="key">${esc(f.key)}</span>${guessRI && f.key === guessRI.key ? ' <span class="ok">← Relation Garage</span>' : ''}`,
             (f) => esc(f.name),
             (f) => `<span class="muted">${esc(f.field_type || '')}</span>`])}
