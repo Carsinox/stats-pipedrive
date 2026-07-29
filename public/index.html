@@ -400,6 +400,15 @@ const tooltip = $('#tooltip');
 
 const nf = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
 const nf1 = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1});
+
+// ----- Commerciaux : exclusion des non-commerciaux + couleur du prénom selon le genre -----
+const NON_COMMERCIAUX = new Set(['aurore','brigitte','gaelle','gedeon','geraldine','john','lea','mathilde','nesher','pierre','thomas']);
+const PRENOMS_F = new Set(['aurore','brigitte','gaelle','geraldine','lea','mathilde','sophie','camille','marie','julie','laura','laure','emma','chloe','manon','sarah','celine','nathalie','sandrine','aurelie','amelie','pauline','oceane','marine','elodie','jessica','melanie','virginie','caroline','audrey','charlotte','clara','ines','lucie','alice','eva','jade','lisa','anais','justine','morgane','coralie','estelle','fanny','maeva','noemie','sabrina','sonia','valentine','victoria','yasmine','lila','lina','nina','romane','agathe','apolline','capucine','faustine','garance','margaux','margot','elise','elsa','emilie','flavie','helene','ophelie','solene','tiffany','angelique','severine','delphine','stephanie','carole','isabelle','veronique','patricia','sylvie','katia','sonya','myriam','samira','nadia','fatima','wafa','ines']);
+const PRENOMS_M = new Set(['gedeon','john','pierre','thomas','nesher','yanis','mathieu','mathis','quentin','kevin','florian','benjamin','guillaume','sebastien','david','jonathan','mickael','cedric','damien','fabien','jerome','ludovic','olivier','vincent','william','yann','dylan','bilal','mehdi','mohamed','karim','sofiane','rayan','hugo','lucas','nathan','leo','louis','gabriel','arthur','jules','adam','raphael','ethan','noah','tom','theo','enzo','clement','maxime','alexandre','antoine','nicolas','julien','romain','baptiste','maxence','valentin','corentin','alexis','anthony','aurelien','bastien','gaetan','gregory','jordan','loic','marc','martin','morgan','pascal','patrice','paul','philippe','remy','simon','steven','sylvain','tanguy','tony','xavier','younes','samir','amine','ayoub','ismael','walid','said','abdel','franck','frederic','laurent','stephane','christophe','gilles','herve','bruno','didier','eric','pascal']);
+const normPrenom = (s)=> String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim().split(/[\s\-']/)[0];
+function isCommercial(name){ return !NON_COMMERCIAUX.has(normPrenom(name)); }
+function genderOf(name){ const p=normPrenom(name); if(PRENOMS_F.has(p)) return 'f'; if(PRENOMS_M.has(p)) return 'm'; return /(a|e|ine|ette)$/.test(p)?'f':'m'; }
+function genderColor(name){ return genderOf(name)==='f' ? '#A970D6' : '#2E6BE6'; } // lilas / bleu
 function money(v){ try{return new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(v||0);}catch(_){return nf.format(v||0)+' €';} }
 function moneyK(v){ return v>=1000 ? (v/1000).toFixed(v>=10000?0:1).replace('.',',')+' k€' : nf.format(Math.round(v))+' €'; }
 const pct=(x)=> x==null?'—':(x*100).toFixed(0)+' %';
@@ -593,7 +602,7 @@ function renderPerfNote(mandats, remb, show){
 function renderRanking(rk,periodLbl){
   $('#rankPeriod').textContent='· '+periodLbl;
   const me=state.user==='all'?null:Number(state.user);
-  const row=(x,i)=>`<li class="${i===0?'top':''} ${me&&x.id===me?'me':''}"><span class="rk">${i+1}</span><span class="rn">${escapeHtml(x.name)}</span><span class="rc">${nf.format(x.count)}</span></li>`;
+  const row=(x,i)=>`<li class="${i===0?'top':''} ${me&&x.id===me?'me':''}"><span class="rk">${i+1}</span><span class="rn" style="color:${genderColor(x.name)}">${escapeHtml(x.name)}</span><span class="rc">${nf.format(x.count)}</span></li>`;
   const fill=(el,arr)=>{ el.innerHTML = arr.length ? arr.map(row).join('') : '<li class="empty">Aucun sur cette période</li>'; };
   fill($('#rankMandats'),rk.mandats);
   fill($('#rankEncaisses'),rk.encaisses);
@@ -664,6 +673,8 @@ function clearCache(){ try{localStorage.removeItem('pd_data');localStorage.remov
 function fetchData(force){ return fetch('/api/data'+(force?('?fresh='+Date.now()):'')).then(r=>r.json()); }
 
 function applyData(d){
+  // Retire les non-commerciaux (managers, admin, etc.) partout : liste déroulante + classement.
+  if(Array.isArray(d.users)) d.users=d.users.filter(u=>isCommercial(u.name));
   state.raw=d;
   const sel=$('#pipelineSel');
   if(sel.dataset.filled!=='1'&&d.pipelines&&d.pipelines.length){
@@ -672,7 +683,7 @@ function applyData(d){
   }
   const usel=$('#userSel');
   if(usel.dataset.filled!=='1'&&d.users&&d.users.length){
-    d.users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.name;usel.appendChild(o);});
+    d.users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.name;o.style.color=genderColor(u.name);o.style.fontWeight='600';usel.appendChild(o);});
     usel.dataset.filled='1';usel.value=state.user;
   }
   const msel=$('#monthSel');

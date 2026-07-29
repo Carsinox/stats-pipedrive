@@ -295,8 +295,11 @@
       if (md && inMonth(md.getTime())) M.set(o, (M.get(o) || 0) + 1);
       if (d.status === 'won') { const wt = parseTs(d.won_time); if (wt && inMonth(wt.getTime())) E.set(o, (E.get(o) || 0) + 1); }
     }
+    // On ne classe que les commerciaux présents dans la liste `users` (les non-commerciaux
+    // en sont retirés en amont) : un propriétaire absent de cette liste est ignoré.
     const build = (map) => [...map.entries()]
-      .map(([id, count]) => ({ id, name: nameOf.get(id) || ('#' + id), count }))
+      .filter(([id]) => nameOf.has(id))
+      .map(([id, count]) => ({ id, name: nameOf.get(id), count }))
       .filter((x) => x.count > 0)
       .sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name), 'fr'));
     return { mandats: build(M), encaisses: build(E), refMonth };
