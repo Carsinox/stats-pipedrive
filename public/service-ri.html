@@ -118,7 +118,7 @@ const state={ri:'all',raw:null};
 
 (function(){const t=localStorage.getItem('pd_theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
 $('#themeBtn').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');const dark=c==='dark'||(c!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);const nx=dark?'light':'dark';document.documentElement.setAttribute('data-theme',nx);try{localStorage.setItem('pd_theme',nx);}catch(_){}if(state.raw)compute();};
-$('#logoutBtn').onclick=async()=>{try{await fetch('/api/logout',{method:'POST'});}catch(_){}location.href='/';};
+$('#logoutBtn').onclick=async()=>{try{await fetch('/api/logout',{method:'POST'});}catch(_){}try{localStorage.removeItem('ri_data');localStorage.removeItem('ri_data_ts');}catch(_){}location.href='/';};
 
 function parseD(s){ if(!s)return null; let x=String(s).trim().replace(' ','T'); if(x.length===10) x+='T00:00:00Z'; else if(!/[zZ]|[+\-]\d\d:?\d\d$/.test(x)) x+='Z'; const d=new Date(x); return isNaN(d)?null:d; }
 // Heures OUVRÉES entre deux dates : lundi→vendredi, 9h–18h (heure locale). Week-ends et hors 9-18 exclus.
@@ -225,26 +225,43 @@ function fillRi(d){
 }
 $('#riSel').onchange=(e)=>{state.ri=e.target.value;compute();};
 
-async function load(force){
+// Cache local : affichage instantané du dernier instantané, puis rafraîchissement en arrière-plan.
+const RI_CK='ri_data', RI_TS='ri_data_ts';
+function readCache(){ try{const r=localStorage.getItem(RI_CK),ts=+localStorage.getItem(RI_TS)||0; if(r && Date.now()-ts<7*864e5) return JSON.parse(r);}catch(_){} return null; }
+function writeCache(d){ try{localStorage.setItem(RI_CK,JSON.stringify(d));localStorage.setItem(RI_TS,String(Date.now()));}catch(_){} }
+function clearCache(){ try{localStorage.removeItem(RI_CK);localStorage.removeItem(RI_TS);}catch(_){} }
+
+function applyData(d){
+  state.raw=d; fillRi(d);
+  const when=new Date(d.generatedAt).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
+  if(d.empty){
+    $('#subline').textContent='Aucun projet récupéré';
+    $('#riNote').innerHTML="⚠ Aucun projet récupéré (raison : <b>"+esc(d.reason||'?')+"</b>). Ouvre <code>/api/ri?debug=1</code> et envoie le résultat pour diagnostic.";
+  } else {
+    $('#subline').textContent='Vos projets Pipedrive · maj '+when;
+    $('#riNote').innerHTML="";
+  }
+  compute();
+  $('#statusBox').style.display='none';$('#content').style.display='block';
+}
+async function fetchRi(force){
+  const r=await fetch('/api/ri'+(force?('?fresh='+Date.now()):''),{cache:'no-store'});
+  if(r.status===401){ location.href='/'; return null; }
+  const d=await r.json();
+  if(d.error) throw new Error(d.message||'Erreur');
+  return d;
+}
+async function refreshBg(){
   $('#refreshBtn').classList.add('spin');
-  try{
-    const r=await fetch('/api/ri'+(force?('?fresh='+Date.now()):''),{cache:'no-store'});
-    if(r.status===401){ location.href='/'; return; }
-    const d=await r.json();
-    if(d.error) throw new Error(d.message||'Erreur');
-    state.raw=d; fillRi(d);
-    const when=new Date(d.generatedAt).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
-    if(d.empty){
-      $('#subline').textContent='Aucun projet récupéré';
-      $('#riNote').innerHTML="⚠ Aucun projet récupéré (raison : <b>"+esc(d.reason||'?')+"</b>). Ouvre <code>/api/ri?debug=1</code> et envoie le résultat pour diagnostic.";
-    } else {
-      $('#subline').textContent='Vos projets Pipedrive · maj '+when;
-      $('#riNote').innerHTML="";
-    }
-    compute();
-    $('#statusBox').style.display='none';$('#content').style.display='block';
-  }catch(e){ $('#statusBox').innerHTML='⚠ '+esc(e.message); }
+  try{ const d=await fetchRi(false); if(d){ writeCache(d); applyData(d); } }catch(_){}
   finally{ $('#refreshBtn').classList.remove('spin'); }
+}
+async function load(force){
+  if(!force){ const c=readCache(); if(c){ applyData(c); refreshBg(); return; } }
+  $('#content').style.display='none';
+  $('#statusBox').style.display='';$('#statusBox').innerHTML='<span class="spin"></span>Chargement du Service RI… (le premier chargement peut prendre quelques secondes)';
+  try{ const d=await fetchRi(force); if(d){ writeCache(d); applyData(d); } }
+  catch(e){ $('#statusBox').innerHTML='⚠ '+esc(e.message); }
 }
 $('#refreshBtn').onclick=()=>load(true);
 fetch('/api/session',{cache:'no-store'}).then(r=>r.json()).then(s=>{ if(s.required) $('#logoutBtn').style.display=''; }).catch(()=>{});

@@ -67,18 +67,30 @@ module.exports = async (req, res) => {
   ]);
 
   // ---- Projets : pagination par CURSEUR (l'endpoint ignore start/limit) ----
-  // On suit next_cursor pour récupérer TOUS les projets, et on garde le jeu le plus complet.
-  const projCandidates = [
-    { label: 'v1 cursor', fn: () => pdGetAllCursor('/projects', 'v1') },
-    { label: 'v2 cursor', fn: () => pdGetAllCursor('/projects', 'v2') },
-    { label: 'v1 start/limit', fn: () => pdGetAllV1('/projects') },
-  ];
+  // OPTIMISATION VITESSE : on NE récupère PAS les projets "completed" (le gros du volume, inutiles
+  // aux bulles). On prend les OUVERTS (+ les ANNULÉS pour le taux). Si le filtre status est ignoré
+  // par l'API, on détecte qu'on a déjà tout et on ne refait pas d'appel.
   let projectsRawSel = [], projUsed = null;
-  for (const c of projCandidates) {
-    try {
-      const v = await c.fn();
-      if (Array.isArray(v) && v.length > projectsRawSel.length) { projectsRawSel = v; projUsed = c.label; }
-    } catch (e) { errs['projects:' + c.label] = String((e && e.message) || e); }
+  try {
+    const open = await pdGetAllCursor('/projects', 'v1', { status: 'open' });
+    if (Array.isArray(open) && open.length) {
+      const filterWorks = !open.some((p) => p.status && p.status !== 'open');
+      if (filterWorks) {
+        projectsRawSel = open; projUsed = 'v1 cursor status=open(+canceled)';
+        try { const canc = await pdGetAllCursor('/projects', 'v1', { status: 'canceled' }); if (Array.isArray(canc)) projectsRawSel = projectsRawSel.concat(canc); }
+        catch (e) { errs['projects:canceled'] = String((e && e.message) || e); }
+      } else { projectsRawSel = open; projUsed = 'v1 cursor (status ignoré = tout)'; }
+    }
+  } catch (e) { errs['projects:open'] = String((e && e.message) || e); }
+  if (!projectsRawSel.length) {
+    for (const c of [
+      { label: 'v1 cursor', fn: () => pdGetAllCursor('/projects', 'v1') },
+      { label: 'v2 cursor', fn: () => pdGetAllCursor('/projects', 'v2') },
+      { label: 'v1 start/limit', fn: () => pdGetAllV1('/projects') },
+    ]) {
+      try { const v = await c.fn(); if (Array.isArray(v) && v.length > projectsRawSel.length) { projectsRawSel = v; projUsed = c.label; } }
+      catch (e) { errs['projects:' + c.label] = String((e && e.message) || e); }
+    }
   }
   // Déduplication de sécurité par id.
   const seenIds = new Set();
@@ -176,7 +188,7 @@ module.exports = async (req, res) => {
   const projRiUser = new Map(projectsRaw.map((p) => [Number(p.id), riUserId(cf(p, riField))]));
 
   // Récupère les notes récentes (triées par date décroissante), plafonné pour la performance.
-  const NOTE_MAX_PAGES = 15;
+  const NOTE_MAX_PAGES = 10;
   const fetchRecentNotes = async () => {
     let out = [], start = 0, cursor = null, useCursor = false;
     for (let i = 0; i < NOTE_MAX_PAGES; i++) {
