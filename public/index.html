@@ -203,6 +203,26 @@
   @keyframes vpaspin{to{transform:rotate(360deg)}}
   #refreshBtn.spinning{animation:vpaspin .8s linear infinite}
 
+  /* ---------- Célébration (confettis) ---------- */
+  .confetti-canvas{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:120;display:none}
+  .celebrate{position:fixed;inset:0;z-index:121;display:none;align-items:center;justify-content:center;padding:24px;
+    background:rgba(15,26,38,.34);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+  .celebrate.on{display:flex}
+  .confetti-canvas.on{display:block}
+  .celebrate-card{background:var(--surface);border-radius:22px;padding:30px 34px;text-align:center;max-width:340px;
+    box-shadow:0 30px 80px rgba(0,0,0,.42);border:1px solid var(--border);transform:scale(.6);opacity:0;
+    animation:celebPop .5s cubic-bezier(.2,1.3,.4,1) forwards}
+  @keyframes celebPop{to{transform:scale(1);opacity:1}}
+  .celebrate-emoji{font-size:70px;line-height:1;animation:celebBounce 1s ease-in-out infinite}
+  @keyframes celebBounce{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-12px) rotate(4deg)}}
+  .celebrate-name{margin-top:10px;font-size:23px;font-weight:850;color:var(--text-primary)}
+  .celebrate-msg{margin-top:6px;font-size:15px;font-weight:650;color:var(--text-secondary);line-height:1.4}
+  .celebrate-count{margin-top:12px;display:inline-block;font-size:14px;font-weight:800;color:#fff;
+    padding:7px 15px;border-radius:999px;background:linear-gradient(120deg,var(--brand-ink),var(--brand-2))}
+  .celebrate-hint{margin-top:16px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  #rankMandats li, #rankEncaisses li{cursor:pointer}
+  #rankMandats li:hover, #rankEncaisses li:hover{background:var(--surface-2)}
+
   /* ---------- Écran de connexion ---------- */
   .login-gate{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;
     background:linear-gradient(140deg,var(--brand-ink),var(--brand-2))}
@@ -289,7 +309,7 @@
     <!-- Objectif mensuel de mandats + batterie de progression -->
     <div class="card objbar">
       <div class="oi">
-        <label>Objectif mensuel de mandats</label>
+        <label id="objLabel">Objectif mensuel de mandats</label>
         <div class="objrow">
           <input id="objInput" type="number" min="0" inputmode="numeric" readonly />
           <span class="lock" id="objLock" title="Objectif verrouillé">🔒</span>
@@ -389,6 +409,18 @@
   </div>
 </div>
 
+<!-- Animation de célébration (clic sur un commercial du classement) -->
+<canvas id="confetti" class="confetti-canvas"></canvas>
+<div id="celebrate" class="celebrate">
+  <div class="celebrate-card" id="celebrateCard">
+    <div class="celebrate-emoji" id="celebrateEmoji">🏆</div>
+    <div class="celebrate-name" id="celebrateName"></div>
+    <div class="celebrate-msg" id="celebrateMsg"></div>
+    <div class="celebrate-count" id="celebrateCount"></div>
+    <div class="celebrate-hint">Touchez pour fermer</div>
+  </div>
+</div>
+
 <script src="stats-client.js"></script>
 <script>
 const $ = (s)=>document.querySelector(s);
@@ -396,7 +428,10 @@ const escapeHtml=(s)=>String(s==null?'':s).replace(/[&<>"']/g,(c)=>({'&':'&amp;'
 const state = { pipeline:'all', user:'all', gran:'month', month:'', obj:null, raw:null, data:null };
 function monthLabelFr(key){const[y,m]=key.split('-');return new Date(Date.UTC(+y,+m-1,1)).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});}
 const tooltip = $('#tooltip');
-(function(){let v=15;try{const n=parseInt(localStorage.getItem('pd_obj'),10);if(Number.isFinite(n)&&n>0)v=n;}catch(_){}state.obj=v;})();
+// Deux objectifs mémorisés séparément : individuel (défaut 15) et ÉQUIPE en vue « Tous » (défaut 250).
+(function(){const rd=(k,def)=>{try{const n=parseInt(localStorage.getItem(k),10);return Number.isFinite(n)&&n>0?n:def;}catch(_){return def;}};state.objIndiv=rd('pd_obj',15);state.objTeam=rd('pd_obj_team',250);})();
+function currentObj(){ return state.user==='all' ? state.objTeam : state.objIndiv; }
+function noteRefObj(){ return state.user==='all' ? state.objTeam : 15; }
 
 const nf = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
 const nf1 = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1});
@@ -544,12 +579,12 @@ function barChart(el,labels,a,b,colA,colB){
 // ---------- rendu ----------
 function addLook(id){ const el=$(id); if(!el)return; el.classList.add('clickable'); el.insertAdjacentHTML('beforeend','<span class="look">détail ›</span>'); }
 // Objectif de MANDATS selon la granularité : mois = M, semaine = M/4, jour = M/20 (20 j ouvrés).
-function objMandatForGran(gran){ const M=state.obj; if(!M||M<=0) return 0; return gran==='day'?M/20:gran==='week'?M/4:M; }
+function objMandatForGran(gran){ const M=currentObj(); if(!M||M<=0) return 0; return gran==='day'?M/20:gran==='week'?M/4:M; }
 function monthTile(el,title,color,value,sub){
   el.innerHTML=`<div class="label"><i class="chip" style="background:${color}"></i>${title}</div><div class="bigval">${nf.format(value)}</div><div class="subfoot">${sub}</div>`;
 }
 function renderBattery(mandatsMonth,monthLbl,transfo){
-  const M=state.obj;
+  const M=currentObj();
   const ratio=(M&&M>0)?mandatsMonth/M:0;
   const filled=Math.max(0,Math.min(10,Math.round(ratio*10)));
   const color = ratio>=0.9?'var(--good)' : ratio>0.6?'var(--brand-2)' : ratio>=0.4?'#EE9A34' : 'var(--critical)';
@@ -576,11 +611,12 @@ function renderBattery(mandatsMonth,monthLbl,transfo){
     if(leg) leg.style.display='none';
   }
 }
-function renderPerfNote(mandats, remb, show){
+function renderPerfNote(mandats, remb, show, refObj, teamMode){
   const el=$('#perfNote');
   if(!show){ el.style.display='none'; return; }
   el.style.display='';
-  const nMand=Math.min(10, mandats*10/15);   // 15 mandats = 10/10
+  const cible=(refObj&&refObj>0)?refObj:15;
+  const nMand=Math.min(10, mandats*10/cible);   // cible mandats = 10/10
   let nRemb, note;
   if(mandats<=0){ nRemb=0; note=0; }          // 0 mandat -> note globale 0/10
   else { const p=remb/mandats*100; nRemb=Math.max(0,(100-p)/10); note=(nMand+nRemb)/2; }
@@ -588,7 +624,8 @@ function renderPerfNote(mandats, remb, show){
   const color = note>=8?'var(--good)' : note>=6?'var(--brand-2)' : note>=4?'#EE9A34' : 'var(--critical)';
   const C=2*Math.PI*26, dash=(Math.max(0,Math.min(1,note/10))*C).toFixed(1);
   const pTxt = mandats>0 ? nf1.format(remb/mandats*100)+' %' : '—';
-  el.title=`Note du mois = moyenne de 2 notes\n• Mandats : ${nf1.format(nMand)}/10 (${nf.format(mandats)} mandats, cible 15 = 10/10)\n• Remboursements : ${nf1.format(nRemb)}/10 (${nf.format(remb)} remb / ${nf.format(mandats)} mandats = ${pTxt})`;
+  const cap = teamMode ? 'Note équipe VPA' : 'Note du mois';
+  el.title=`${cap} = moyenne de 2 notes\n• Mandats : ${nf1.format(nMand)}/10 (${nf.format(mandats)} mandats, cible ${nf.format(cible)} = 10/10)\n• Remboursements : ${nf1.format(nRemb)}/10 (${nf.format(remb)} remb / ${nf.format(mandats)} mandats = ${pTxt})`;
   el.innerHTML=
     `<svg viewBox="0 0 64 64" width="70" height="70" class="pn-ring">`+
       `<circle cx="32" cy="32" r="26" fill="none" stroke="var(--grid)" stroke-width="7"/>`+
@@ -596,16 +633,59 @@ function renderPerfNote(mandats, remb, show){
       `<text x="32" y="31" text-anchor="middle" class="pn-num" fill="${color}">${nf1.format(r)}</text>`+
       `<text x="32" y="43" text-anchor="middle" class="pn-den">/10</text>`+
     `</svg>`+
-    `<div class="pn-cap">Note du mois</div>`+
+    `<div class="pn-cap">${cap}</div>`+
     `<div class="pn-detail">📈 Mandats ${nf1.format(nMand)}/10 · 💸 Remb ${nf1.format(nRemb)}/10</div>`;
 }
+// ---------- Célébration : confettis + message (clic sur un commercial du classement) ----------
+const CELEB={ raf:0, parts:[], end:0, timer:0 };
+const cvs=$('#confetti'), cxx=cvs.getContext('2d');
+function launchConfetti(colors){
+  cvs.width=innerWidth; cvs.height=innerHeight;
+  const N=170; CELEB.parts=[];
+  for(let i=0;i<N;i++){ CELEB.parts.push({
+    x:innerWidth*(0.15+0.7*Math.random()), y:innerHeight*0.34+(Math.random()*50-25),
+    vx:(Math.random()-0.5)*10, vy:Math.random()*-12-4, g:0.26+Math.random()*0.13,
+    s:5+Math.random()*7, rot:Math.random()*6.28, vr:(Math.random()-0.5)*0.34,
+    c:colors[i%colors.length], shape:Math.random()<0.5?0:1 }); }
+  CELEB.end=performance.now()+2600; cvs.classList.add('on'); cancelAnimationFrame(CELEB.raf);
+  const step=()=>{ cxx.clearRect(0,0,cvs.width,cvs.height); let alive=0;
+    for(const p of CELEB.parts){ p.vy+=p.g; p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr; p.vx*=0.99;
+      if(p.y<cvs.height+24) alive++;
+      cxx.save(); cxx.translate(p.x,p.y); cxx.rotate(p.rot); cxx.fillStyle=p.c;
+      if(p.shape===0) cxx.fillRect(-p.s/2,-p.s/2,p.s,p.s*0.6);
+      else { cxx.beginPath(); cxx.arc(0,0,p.s/2,0,7); cxx.fill(); } cxx.restore(); }
+    if(alive>0 && performance.now()<CELEB.end+1400) CELEB.raf=requestAnimationFrame(step);
+    else { cxx.clearRect(0,0,cvs.width,cvs.height); cvs.classList.remove('on'); } };
+  CELEB.raf=requestAnimationFrame(step);
+}
+const CELEB_TOP={
+  mandats:['Champion des mandats ! 🥇','Roi de la signature 👑','En feu ce mois-ci ! 🔥','N°1, personne ne suit 🚀'],
+  encaisses:['Champion des encaissements ! 💰','La caisse chante 🎺','Machine à cash 💸','N°1, ça rentre ! 🤑'] };
+const CELEB_OTHER=['Bravo, continue ! 👏','Belle perf 💪','Ça avance fort 🚀','Joli travail ✨','Au top 🙌'];
+const cpick=(a)=>a[Math.floor(Math.random()*a.length)];
+function closeCelebrate(){ $('#celebrate').classList.remove('on'); cancelAnimationFrame(CELEB.raf); cvs.classList.remove('on'); cxx.clearRect(0,0,cvs.width,cvs.height); clearTimeout(CELEB.timer); }
+function celebrate(name,rank,kind,count){
+  const gold=['#D4AF37','#F4D03F','#FFE07A'], silver=['#A8B4C0','#CBD5E0','#E2E8F0'], festive=['#FF5E5B','#2E6BE6','#A970D6','#2CB86A','#EE9A34'];
+  launchConfetti((kind==='encaisses'?gold:silver).concat(festive));
+  $('#celebrateEmoji').textContent = rank===0 ? (kind==='encaisses'?'🥇':'🏆') : '🎉';
+  const nm=$('#celebrateName'); nm.textContent=name; nm.style.color=genderColor(name);
+  $('#celebrateMsg').textContent = rank===0 ? cpick(CELEB_TOP[kind]) : cpick(CELEB_OTHER);
+  $('#celebrateCount').textContent = (kind==='encaisses'?'💼 '+nf.format(count)+' encaissé'+(count>1?'s':'') : '📄 '+nf.format(count)+' mandat'+(count>1?'s':''));
+  const ov=$('#celebrate'); ov.classList.add('on');
+  const card=$('#celebrateCard'); card.style.animation='none'; void card.offsetWidth; card.style.animation='';
+  clearTimeout(CELEB.timer); CELEB.timer=setTimeout(closeCelebrate,6000);
+}
+$('#celebrate').onclick=closeCelebrate;
+
 function renderRanking(rk,periodLbl){
   $('#rankPeriod').textContent='· '+periodLbl;
   const me=state.user==='all'?null:Number(state.user);
-  const row=(x,i)=>`<li class="${i===0?'top':''} ${me&&x.id===me?'me':''}"><span class="rk">${i+1}</span><span class="rn" style="color:${genderColor(x.name)}">${escapeHtml(x.name)}</span><span class="rc">${nf.format(x.count)}</span></li>`;
-  const fill=(el,arr)=>{ el.innerHTML = arr.length ? arr.map(row).join('') : '<li class="empty">Aucun sur cette période</li>'; };
-  fill($('#rankMandats'),rk.mandats);
-  fill($('#rankEncaisses'),rk.encaisses);
+  const row=(x,i,kind)=>`<li class="${i===0?'top':''} ${me&&x.id===me?'me':''}" data-name="${escapeHtml(x.name)}" data-rank="${i}" data-count="${x.count}" data-kind="${kind}"><span class="rk">${i+1}</span><span class="rn" style="color:${genderColor(x.name)}">${escapeHtml(x.name)}</span><span class="rc">${nf.format(x.count)}</span></li>`;
+  const fill=(el,arr,kind)=>{ el.innerHTML = arr.length ? arr.map((x,i)=>row(x,i,kind)).join('') : '<li class="empty">Aucun sur cette période</li>'; };
+  fill($('#rankMandats'),rk.mandats,'mandats');
+  fill($('#rankEncaisses'),rk.encaisses,'encaisses');
+  const onClick=(e)=>{ const li=e.target.closest('li[data-name]'); if(!li)return; celebrate(li.dataset.name,+li.dataset.rank,li.dataset.kind,+li.dataset.count); };
+  $('#rankMandats').onclick=onClick; $('#rankEncaisses').onclick=onClick;
 }
 function render(d){
   const k=d.kpis, mm=d.monthMode, ml=mm?monthLabelFr(d.refMonth):'mois';
@@ -627,8 +707,11 @@ function render(d){
   renderAnnul($('#tileAnnul'), k.mandats.month, k.remboursementsCount, ml);
 
   ['#tileCE','#tileR2','#tileMandat','#tileCA','#tilePot','#tileRemb'].forEach(addLook);
+  const teamView=state.user==='all';
+  if(objInput.readOnly) objInput.value=currentObj();
+  $('#objLabel').textContent = teamView ? 'Objectif mensuel de mandats — Équipe VPA' : 'Objectif mensuel de mandats';
   renderBattery(k.mandats.month, mm?ml:null, k.tauxTransfo);
-  renderPerfNote(k.mandats.month, k.remboursementsCount, state.user!=='all');
+  renderPerfNote(k.mandats.month, k.remboursementsCount, true, noteRefObj(), teamView);
 
   const rk=window.PDStats.ranking(state.raw, state.mapping, {nowMs:Date.parse(state.raw.generatedAt)||Date.now(), month: state.month||undefined});
   renderRanking(rk, mm?ml:'mois en cours');
@@ -780,7 +863,7 @@ $('#ceModal').addEventListener('click',(e)=>{if(e.target.id==='ceModal')$('#ceMo
 
 // ---------- champ objectif ----------
 const objInput=$('#objInput');
-objInput.value=state.obj;
+objInput.value=currentObj();
 function setObjLock(locked){
   objInput.readOnly=locked;
   $('#objLock').style.display=locked?'':'none';
@@ -791,8 +874,11 @@ function setObjLock(locked){
 $('#objEdit').onclick=()=>setObjLock(false);
 $('#objSave').onclick=()=>{
   const v=parseInt(objInput.value,10);
-  if(Number.isFinite(v)&&v>0){ state.obj=v; try{localStorage.setItem('pd_obj',String(v));}catch(_){} }
-  objInput.value=state.obj;
+  if(Number.isFinite(v)&&v>0){
+    if(state.user==='all'){ state.objTeam=v; try{localStorage.setItem('pd_obj_team',String(v));}catch(_){} }
+    else { state.objIndiv=v; try{localStorage.setItem('pd_obj',String(v));}catch(_){} }
+  }
+  objInput.value=currentObj();
   setObjLock(true);
   if(state.data) render(state.data);
 };
