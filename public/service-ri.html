@@ -210,7 +210,9 @@ function compute(){
   const inRange=(p)=> arIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=arIdx && p.idx<=cpiIdx;
   const annulMois=list.filter(p=> p.status==='canceled' && inRange(p) && mkey(p.scMs)===curM).length;
   const ouvertsAR=list.filter(p=> p.status==='open' && arIdx!=null && p.idx!=null && p.idx>=arIdx).length;
-  const taux= ouvertsAR>0 ? annulMois/ouvertsAR*100 : null;
+  // Dénominateur = ouverts (≥ À relancer) + annulés du mois, pour que le taux reste borné à 100 %.
+  const baseAnnul=ouvertsAR+annulMois;
+  const taux= baseAnnul>0 ? annulMois/baseAnnul*100 : null;
   // Délai de réponse (heures ouvrées) : projets ouverts de « Validation garage » à « Attente doc CPI ».
   const inDelai=(p)=> p.status==='open' && validIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=validIdx && p.idx<=cpiIdx;
   const dels=list.filter(inDelai).map(p=>p.updMs?bizHours(p.updMs,nowMs):null).filter(v=>v!=null&&v>=0);
