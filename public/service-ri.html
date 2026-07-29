@@ -118,11 +118,12 @@ function bubble(label,value,foot,accent){
 }
 
 function metrics(list,nowMs,ph){
-  const enCours=list.filter(p=>p.status!=='canceled'&&p.status!=='completed'&&p.status!=='deleted');
-  const attente=list.filter(p=>ph.arId!=null && p.pid===ph.arId && p.status==='open');       // étape "A relancer"
-  const bdc=list.filter(p=>ph.bdcIdx!=null && p.idx!=null && p.idx>=ph.bdcIdx);               // a atteint "BDC à signer"
-  const paiement=list.filter(p=>ph.paieId!=null && p.pid===ph.paieId);                        // étape "Paiement total"
-  const docs=list.filter(p=>ph.cpiId!=null && p.pid===ph.cpiId);                              // étape "Attente doc CPI"
+  const enCours=list.filter(p=>p.status==='open');                                            // ni annulé ni terminé
+  const atOpen=(id)=>list.filter(p=>id!=null && p.pid===id && p.status==='open');             // ouverts, à l'étape courante
+  const attente=atOpen(ph.arId);   // étape "A relancer"
+  const bdc=atOpen(ph.bdcId);      // étape "BDC à signer"
+  const paiement=atOpen(ph.paieId);// étape "Paiement total"
+  const docs=atOpen(ph.cpiId);     // étape "Attente doc CPI"
   const reachedAR=list.filter(p=> ph.arIdx!=null && p.idx!=null && p.idx>=ph.arIdx);   // ont atteint "À relancer"
   const cancelAfterAR=reachedAR.filter(p=>p.status==='canceled').length;
   const taux=reachedAR.length>0 ? cancelAfterAR/reachedAR.length*100 : null;           // borné à 100 %
@@ -145,7 +146,7 @@ function compute(){
   const bdcP = findP(n=>/bdc\s*a\s*signer/.test(n)) || findP(n=>/bdc/.test(n)&&/signer/.test(n)); // "BDC à signer"
   const paieP= findP(n=>/paiement\s*total/.test(n));                          // "Paiement total - CT OK"
   const cpiP = findP(n=>/doc\s*cpi/.test(n)) || findP(n=>/cpi/.test(n)&&/attente/.test(n));       // "Attente doc CPI"
-  const ph={ arId:arP?Number(arP.id):null, arIdx:arP?idxOf(arP.id):null, bdcIdx:bdcP?idxOf(bdcP.id):null, paieId:paieP?Number(paieP.id):null, cpiId:cpiP?Number(cpiP.id):null };
+  const ph={ arId:arP?Number(arP.id):null, arIdx:arP?idxOf(arP.id):null, bdcId:bdcP?Number(bdcP.id):null, paieId:paieP?Number(paieP.id):null, cpiId:cpiP?Number(cpiP.id):null };
 
   const collabs=(d.collaborators||[]);
   const ftok=(s)=>norm(s).split(/[\s\-']/)[0];        // prénom (gère « Géraldine Dupont » -> geraldine)
@@ -166,7 +167,7 @@ function compute(){
   $('#globalGrid').innerHTML=[
     bubble('Projets en cours','<b>'+nf.format(g.enCours)+'</b>','ni annulés ni terminés','var(--brand)'),
     bubble('En attente de traitement',nf.format(g.attente),'étape « À relancer »','var(--s-r2)'),
-    bubble('BDC obtenus',nf.format(g.bdc),'ont atteint « BDC à signer »','var(--s-ce)'),
+    bubble('BDC obtenus',nf.format(g.bdc),'à l’étape « BDC à signer »','var(--s-ce)'),
     bubble('Paiement total',nf.format(g.paiement),'étape « Paiement total »','var(--s-mandat)'),
     bubble('Attente doc CPI',nf.format(g.docs),'étape « Attente doc CPI »','#EE9A34'),
   ].join('').replace(/<b>|<\/b>/g,'');
@@ -179,7 +180,7 @@ function compute(){
   $('#riGrid').innerHTML=[
     bubble('Projets en cours',nf.format(r.enCours),'ni annulés ni terminés','var(--brand)'),
     bubble('En attente de traitement',nf.format(r.attente),'étape « À relancer »','var(--s-r2)'),
-    bubble('BDC obtenus',nf.format(r.bdc),'ont atteint « BDC à signer »','var(--s-ce)'),
+    bubble('BDC obtenus',nf.format(r.bdc),'à l’étape « BDC à signer »','var(--s-ce)'),
     bubble('Paiement total',nf.format(r.paiement),'étape « Paiement total »','var(--s-mandat)'),
     bubble('Attente doc CPI',nf.format(r.docs),'étape « Attente doc CPI »','#EE9A34'),
     bubble("Taux d'annulation", r.taux==null?'—':nf1.format(r.taux)+' %', 'annulés / total ayant atteint « À relancer »', tauxCol),
