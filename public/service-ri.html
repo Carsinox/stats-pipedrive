@@ -124,10 +124,14 @@ function metrics(list,nowMs,ph){
   const bdc=atOpen(ph.bdcId);      // étape "BDC à signer"
   const paiement=atOpen(ph.paieId);// étape "Paiement total"
   const docs=atOpen(ph.cpiId);     // étape "Attente doc CPI"
-  const reachedAR=list.filter(p=> ph.arIdx!=null && p.idx!=null && p.idx>=ph.arIdx);   // ont atteint "À relancer"
+  // Taux d'annulation : projets de "À relancer" (ordre 4) à "Attente doc CPI" (ordre 16) inclus.
+  const inTaux=(p)=> ph.arIdx!=null && ph.cpiIdx!=null && p.idx!=null && p.idx>=ph.arIdx && p.idx<=ph.cpiIdx;
+  const reachedAR=list.filter(inTaux);
   const cancelAfterAR=reachedAR.filter(p=>p.status==='canceled').length;
   const taux=reachedAR.length>0 ? cancelAfterAR/reachedAR.length*100 : null;           // borné à 100 %
-  const dels=enCours.map(p=>p.updMs?(nowMs-p.updMs)/3600000:null).filter(v=>v!=null&&v>=0);
+  // Délai de réponse : projets OUVERTS de "Validation garage" (ordre 2) à "Attente doc CPI" (ordre 16).
+  const inDelai=(p)=> p.status==='open' && ph.validIdx!=null && ph.cpiIdx!=null && p.idx!=null && p.idx>=ph.validIdx && p.idx<=ph.cpiIdx;
+  const dels=list.filter(inDelai).map(p=>p.updMs?(nowMs-p.updMs)/3600000:null).filter(v=>v!=null&&v>=0);
   const delai=dels.length ? dels.reduce((a,b)=>a+b,0)/dels.length : null;
   const retard=dels.filter(h=>h>24).length;
   return {enCours:enCours.length,attente:attente.length,bdc:bdc.length,paiement:paiement.length,docs:docs.length,taux,delai,retard,total:list.length};
@@ -142,11 +146,14 @@ function compute(){
   const orderIdx=new Map(); phases.forEach((p,i)=>orderIdx.set(Number(p.id), p.order_nr!=null?Number(p.order_nr):i));
   const idxOf=(pid)=>{const v=orderIdx.get(Number(pid));return v!=null?v:null;};
   const findP=(t)=>phases.find(p=>t(norm(p.name)));
-  const arP  = findP(n=>/relancer/.test(n)&&!/tuv/.test(n));                 // "A relancer - attente infos"
+  const validP= findP(n=>/validation/.test(n));                              // "Validation garage" (ordre 2)
+  const arP  = findP(n=>/relancer/.test(n)&&!/tuv/.test(n));                 // "A relancer - attente infos" (ordre 4)
   const bdcP = findP(n=>/bdc\s*a\s*signer/.test(n)) || findP(n=>/bdc/.test(n)&&/signer/.test(n)); // "BDC à signer"
   const paieP= findP(n=>/paiement\s*total/.test(n));                          // "Paiement total - CT OK"
-  const cpiP = findP(n=>/doc\s*cpi/.test(n)) || findP(n=>/cpi/.test(n)&&/attente/.test(n));       // "Attente doc CPI"
-  const ph={ arId:arP?Number(arP.id):null, arIdx:arP?idxOf(arP.id):null, bdcId:bdcP?Number(bdcP.id):null, paieId:paieP?Number(paieP.id):null, cpiId:cpiP?Number(cpiP.id):null };
+  const cpiP = findP(n=>/doc\s*cpi/.test(n)) || findP(n=>/cpi/.test(n)&&/attente/.test(n));       // "Attente doc CPI" (ordre 16)
+  const ph={ arId:arP?Number(arP.id):null, arIdx:arP?idxOf(arP.id):null, bdcId:bdcP?Number(bdcP.id):null,
+    paieId:paieP?Number(paieP.id):null, cpiId:cpiP?Number(cpiP.id):null,
+    validIdx:validP?idxOf(validP.id):null, cpiIdx:cpiP?idxOf(cpiP.id):null };
 
   const collabs=(d.collaborators||[]);
   const ftok=(s)=>norm(s).split(/[\s\-']/)[0];        // prénom (gère « Géraldine Dupont » -> geraldine)
@@ -158,8 +165,9 @@ function compute(){
   // Un projet OUVERT compte toujours (c'est l'état actuel du service) ;
   // les projets terminés/annulés ne comptent que si leur date récente est dans la période.
   const inPeriod=(p)=>{ if(p.status==='open') return true; const r=parseD(p.update_time)||parseD(p.start_date); return !r || r.getTime()>=pStart; };
+  const tms=(p)=>{ const r=parseD(p.resp_time)||parseD(p.update_time); return r?r.getTime():null; }; // dernière "réponse"
   const scope=(d.projects||[]).filter(p=> p.status!=='deleted' && riOf(p) && inPeriod(p)).map(p=>{
-    return {ri:riOf(p),status:p.status,pid:Number(p.phase_id),idx:idxOf(p.phase_id),updMs:parseD(p.update_time)?parseD(p.update_time).getTime():null};
+    return {ri:riOf(p),status:p.status,pid:Number(p.phase_id),idx:idxOf(p.phase_id),updMs:tms(p)};
   });
 
   // ---- Global (tous les RI) — fixe ----
@@ -183,8 +191,8 @@ function compute(){
     bubble('BDC obtenus',nf.format(r.bdc),'à l’étape « BDC à signer »','var(--s-ce)'),
     bubble('Paiement total',nf.format(r.paiement),'étape « Paiement total »','var(--s-mandat)'),
     bubble('Attente doc CPI',nf.format(r.docs),'étape « Attente doc CPI »','#EE9A34'),
-    bubble("Taux d'annulation", r.taux==null?'—':nf1.format(r.taux)+' %', 'annulés / total ayant atteint « À relancer »', tauxCol),
-    bubble('Délai moyen', r.delai==null?'—':nf.format(Math.round(r.delai))+' h', (r.delai!=null&&r.delai>24?'⚠ ':'')+ (r.retard? r.retard+' projet(s) > 24 h':'traitement à jour'), delaiCol),
+    bubble("Taux d'annulation", r.taux==null?'—':nf1.format(r.taux)+' %', 'annulés · « À relancer » → « Attente doc CPI »', tauxCol),
+    bubble('Délai de réponse', r.delai==null?'—':nf.format(Math.round(r.delai))+' h', (r.delai!=null&&r.delai>24?'⚠ ':'')+ (r.retard? r.retard+' projet(s) > 24 h':'à jour')+' · « Validation garage » → « Attente doc CPI »', delaiCol),
   ].join('');
 }
 
@@ -209,7 +217,7 @@ async function load(force){
       $('#riNote').innerHTML="⚠ Aucun projet récupéré (raison : <b>"+esc(d.reason||'?')+"</b>). Ouvre <code>/api/ri?debug=1</code> et envoie le résultat pour diagnostic.";
     } else {
       $('#subline').textContent='Vos projets Pipedrive · maj '+when;
-      $('#riNote').innerHTML="Réparti par « Relation Garage», sans automatisation : calculé sur la phase, le statut et la dernière mise à jour du projet.";
+      $('#riNote').innerHTML="Réparti par « Relation Garage ». Délai de réponse = temps depuis le plus récent de : modification d'un champ, avancement de phase, ou note postée par le RI.";
     }
     compute();
     $('#statusBox').style.display='none';$('#content').style.display='block';

@@ -163,21 +163,61 @@ module.exports = async (req, res) => {
     return;
   }
 
-  res.setHeader('Cache-Control', authRequired() ? 'private, max-age=120' : 's-maxage=120, stale-while-revalidate=86400');
+  res.setHeader('Cache-Control', authRequired() ? 'private, max-age=300' : 's-maxage=300, stale-while-revalidate=86400');
 
   if (!Array.isArray(projectsRaw) || !projectsRaw.length) {
     return sendEmpty('no_projects', { errors: errs, endpointsUsed });
   }
 
-  const projects = projectsRaw.map((p) => ({
-    id: p.id, title: p.title, deal_ids: p.deal_ids || [],
-    status: p.status,
-    phase_id: idOf(p.phase_id != null ? p.phase_id : p.stage_id), // la donnée projet expose "phase_id"
-    board_id: idOf(p.board_id != null ? p.board_id : p.pipeline_id),
-    start_date: p.start_date || null, end_date: p.end_date || null,
-    update_time: p.update_time || p.status_change_time || p.updated || null,
-    custom_fields: { relation_garage: riLabel(cf(p, riField)) },
-  }));
+  // ---- "Délai de réponse" : dernière note du RI sur le projet ----
+  // Signaux = champ modifié (update_time) OU avancement de phase (status_change_time) OU note du RI.
+  const srvT = (s) => { if (!s) return 0; let x = String(s).trim().replace(' ', 'T'); if (!/[zZ]|[+\-]\d\d:?\d\d$/.test(x)) x += 'Z'; const d = new Date(x); return isNaN(d) ? 0 : d.getTime(); };
+  const riUserId = (v) => { if (v == null) return null; if (typeof v === 'object') v = (v.id != null ? v.id : v.value); const n = Number(v); return Number.isFinite(n) ? n : null; };
+  const projRiUser = new Map(projectsRaw.map((p) => [Number(p.id), riUserId(cf(p, riField))]));
+
+  // Récupère les notes récentes (triées par date décroissante), plafonné pour la performance.
+  const NOTE_MAX_PAGES = 15;
+  const fetchRecentNotes = async () => {
+    let out = [], start = 0, cursor = null, useCursor = false;
+    for (let i = 0; i < NOTE_MAX_PAGES; i++) {
+      const params = useCursor ? { limit: 500, cursor } : { limit: 500, start, sort: 'add_time DESC' };
+      let page;
+      try { page = await pdGet('/notes', params, 'v1'); } catch (e) { errs['notes:fetch'] = String((e && e.message) || e); break; }
+      if (Array.isArray(page.data)) out = out.concat(page.data);
+      const ad = page.additional_data || {};
+      if (ad.next_cursor) { useCursor = true; cursor = ad.next_cursor; }
+      else if (ad.pagination && ad.pagination.more_items_in_collection) { start = ad.pagination.next_start; }
+      else break;
+    }
+    return out;
+  };
+  const notes = await fetchRecentNotes();
+  // Par projet : date de la note la plus récente postée PAR LE RI assigné au projet.
+  const projNoteTs = new Map();
+  for (const n of notes) {
+    const pj = n.project_id != null ? Number(n.project_id) : null;
+    if (pj == null) continue;
+    const ri = projRiUser.get(pj);
+    if (ri != null && Number(n.user_id) !== ri) continue; // uniquement les notes du RI du projet
+    const t = srvT(n.add_time);
+    if (t && (!projNoteTs.has(pj) || t > projNoteTs.get(pj))) projNoteTs.set(pj, t);
+  }
+  const notesCovered = projNoteTs.size;
+
+  const projects = projectsRaw.map((p) => {
+    const respMs = Math.max(srvT(p.update_time), srvT(p.status_change_time), projNoteTs.get(Number(p.id)) || 0);
+    return {
+      id: p.id, title: p.title, deal_ids: p.deal_ids || [],
+      status: p.status,
+      phase_id: idOf(p.phase_id != null ? p.phase_id : p.stage_id), // la donnée projet expose "phase_id"
+      board_id: idOf(p.board_id != null ? p.board_id : p.pipeline_id),
+      start_date: p.start_date || null, end_date: p.end_date || null,
+      update_time: p.update_time || p.status_change_time || p.updated || null,
+      // Date de dernière "réponse" (max des 3 signaux) — utilisée pour le délai de réponse.
+      resp_time: respMs ? new Date(respMs).toISOString() : (p.update_time || null),
+      custom_fields: { relation_garage: riLabel(cf(p, riField)) },
+    };
+  });
 
   // Liste des RI présents dans les données (dynamique) : whoever a un projet avec "Relation Garage".
   const foundRIs = [...new Set(projects.map((p) => p.custom_fields.relation_garage).filter((v) => v != null && String(v).trim() !== ''))]
@@ -193,5 +233,6 @@ module.exports = async (req, res) => {
     foundRIs,                         // tous les RI présents (info)
     riField: 'relation_garage',       // clé sous laquelle la valeur est exposée à la page
     riSource: riField,                // clé Pipedrive réelle (info)
+    notesCovered,                     // nb de projets ayant une note récente du RI (info)
   }));
 };
