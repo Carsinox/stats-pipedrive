@@ -112,6 +112,24 @@ $('#logoutBtn').onclick=async()=>{try{await fetch('/api/logout',{method:'POST'})
 
 function parseD(s){ if(!s)return null; let x=String(s).trim().replace(' ','T'); if(x.length===10) x+='T00:00:00Z'; else if(!/[zZ]|[+\-]\d\d:?\d\d$/.test(x)) x+='Z'; const d=new Date(x); return isNaN(d)?null:d; }
 function periodStart(nowMs){ const d=new Date(nowMs);const back=state.period==='month'?0:state.period==='3m'?2:state.period==='6m'?5:11; return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()-back,1); }
+// Heures OUVRÉES entre deux dates : lundi→vendredi, 9h–18h (heure locale). Week-ends et hors 9-18 exclus.
+function bizHours(startMs,endMs){
+  if(!(endMs>startMs)) return 0;
+  if(endMs-startMs > 45*86400000) return 999; // au-delà de ~45 j : de toute façon très en retard
+  const H0=9,H1=18; let total=0;
+  const day=new Date(startMs); day.setHours(0,0,0,0);
+  while(day.getTime()<endMs){
+    const dow=day.getDay(); // 0=dim, 6=sam
+    if(dow!==0 && dow!==6){
+      const ws=new Date(day); ws.setHours(H0,0,0,0);
+      const we=new Date(day); we.setHours(H1,0,0,0);
+      const s=Math.max(startMs, ws.getTime()), e=Math.min(endMs, we.getTime());
+      if(e>s) total+=(e-s);
+    }
+    day.setDate(day.getDate()+1);
+  }
+  return total/3600000;
+}
 
 function bubble(label,value,foot,accent){
   return `<div class="bubble" style="--accent:${accent||'var(--brand)'}"><div class="blab">${label}</div><div class="bval"${accent&&accent.startsWith('#')?` style="color:${accent}"`:''}>${value}</div><div class="bfoot">${foot||''}</div></div>`;
@@ -131,7 +149,7 @@ function metrics(list,nowMs,ph){
   const taux=reachedAR.length>0 ? cancelAfterAR/reachedAR.length*100 : null;           // borné à 100 %
   // Délai de réponse : projets OUVERTS de "Validation garage" (ordre 2) à "Attente doc CPI" (ordre 16).
   const inDelai=(p)=> p.status==='open' && ph.validIdx!=null && ph.cpiIdx!=null && p.idx!=null && p.idx>=ph.validIdx && p.idx<=ph.cpiIdx;
-  const dels=list.filter(inDelai).map(p=>p.updMs?(nowMs-p.updMs)/3600000:null).filter(v=>v!=null&&v>=0);
+  const dels=list.filter(inDelai).map(p=>p.updMs?bizHours(p.updMs,nowMs):null).filter(v=>v!=null&&v>=0);
   const delai=dels.length ? dels.reduce((a,b)=>a+b,0)/dels.length : null;
   const retard=dels.filter(h=>h>24).length;
   return {enCours:enCours.length,attente:attente.length,bdc:bdc.length,paiement:paiement.length,docs:docs.length,taux,delai,retard,total:list.length};
@@ -192,7 +210,7 @@ function compute(){
     bubble('Paiement total',nf.format(r.paiement),'étape « Paiement total »','var(--s-mandat)'),
     bubble('Attente doc CPI',nf.format(r.docs),'étape « Attente doc CPI »','#EE9A34'),
     bubble("Taux d'annulation", r.taux==null?'—':nf1.format(r.taux)+' %', 'annulés · « À relancer » → « Attente doc CPI »', tauxCol),
-    bubble('Délai de réponse', r.delai==null?'—':nf.format(Math.round(r.delai))+' h', (r.delai!=null&&r.delai>24?'⚠ ':'')+ (r.retard? r.retard+' projet(s) > 24 h':'à jour')+' · « Validation garage » → « Attente doc CPI »', delaiCol),
+    bubble('Délai de réponse', r.delai==null?'—':nf.format(Math.round(r.delai))+' h ouvrées', (r.delai!=null&&r.delai>24?'⚠ ':'')+ (r.retard? r.retard+' projet(s) > 24 h':'à jour')+' · Lun–Ven 9h–18h · Valid. garage → Doc CPI', delaiCol),
   ].join('');
 }
 
@@ -217,7 +235,7 @@ async function load(force){
       $('#riNote').innerHTML="⚠ Aucun projet récupéré (raison : <b>"+esc(d.reason||'?')+"</b>). Ouvre <code>/api/ri?debug=1</code> et envoie le résultat pour diagnostic.";
     } else {
       $('#subline').textContent='Vos projets Pipedrive · maj '+when;
-      $('#riNote').innerHTML="Réparti par « Relation Garage ». Délai de réponse = temps depuis le plus récent de : modification d'un champ, avancement de phase, ou note postée par le RI.";
+      $('#riNote').innerHTML="Réparti par « Relation Garage ». Délai de réponse = temps <b>en heures ouvrées</b> (Lun–Ven 9h–18h, week-ends exclus) depuis le plus récent de : modification d'un champ, avancement de phase, ou note postée par le RI.";
     }
     compute();
     $('#statusBox').style.display='none';$('#content').style.display='block';
