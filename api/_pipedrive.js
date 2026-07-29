@@ -56,6 +56,20 @@ async function pdGetAll(path, params = {}) {
   return out;
 }
 
+// Pagination par CURSEUR (next_cursor) sur une version d'API donnée.
+// Nécessaire pour /projects : l'endpoint ignore start/limit et n'avance que par curseur.
+async function pdGetAllCursor(path, version = 'v2', params = {}) {
+  let cursor = null;
+  let out = [];
+  for (let i = 0; i < MAX_PAGES; i++) {
+    const page = await pdGet(path, { ...params, limit: PAGE_LIMIT, cursor }, version);
+    if (Array.isArray(page.data)) out = out.concat(page.data);
+    cursor = page.additional_data && page.additional_data.next_cursor;
+    if (!cursor) break;
+  }
+  return out;
+}
+
 // Pagination v1 par start/limit (utilisée pour les définitions de champs).
 async function pdGetAllV1(path, params = {}) {
   let start = 0;
@@ -70,4 +84,4 @@ async function pdGetAllV1(path, params = {}) {
   return out;
 }
 
-module.exports = { getConfig, cleanDomain, pdGet, pdGetAll, pdGetAllV1 };
+module.exports = { getConfig, cleanDomain, pdGet, pdGetAll, pdGetAllV1, pdGetAllCursor };

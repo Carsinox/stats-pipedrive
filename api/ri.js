@@ -7,7 +7,7 @@
 //
 // Diagnostic : ouvrir /api/ri?debug=1 (connecté) pour voir les compteurs, phases, valeurs RI et erreurs.
 
-const { getConfig, pdGetAll, pdGetAllV1, pdGet } = require('./_pipedrive');
+const { getConfig, pdGetAll, pdGetAllV1, pdGetAllCursor, pdGet } = require('./_pipedrive');
 const { isAuthed, authRequired } = require('./_auth');
 const { RI_COLLABS } = require('./_ri');
 
@@ -66,25 +66,18 @@ module.exports = async (req, res) => {
     safe('users', pdGet('/users', {}, 'v1').then((r) => r.data || [])),
   ]);
 
-  // ---- Projets : on veut les plus RÉCENTS ----
-  // L'API v1 ignore start/sort sur ce compte et renvoie un jeu fixe (souvent les plus anciens).
-  // On tente donc plusieurs stratégies et on GARDE celle dont la date la plus récente est la plus élevée.
-  const srvT = (s) => { if (!s) return 0; const d = new Date(String(s).replace(' ', 'T')); return isNaN(d) ? 0 : d.getTime(); };
+  // ---- Projets : pagination par CURSEUR (l'endpoint ignore start/limit) ----
+  // On suit next_cursor pour récupérer TOUS les projets, et on garde le jeu le plus complet.
   const projCandidates = [
-    { label: 'v2 /projects', fn: () => pdGetAll('/projects') },
-    { label: 'v1 sort update_time DESC', fn: () => pdGetAllV1('/projects', { sort: 'update_time DESC' }) },
-    { label: 'v1 sort add_time DESC', fn: () => pdGetAllV1('/projects', { sort: 'add_time DESC' }) },
-    { label: 'v1 order_by update_time desc', fn: () => pdGetAllV1('/projects', { order_by: 'update_time', order_direction: 'desc' }) },
-    { label: 'v1 default', fn: () => pdGetAllV1('/projects') },
+    { label: 'v1 cursor', fn: () => pdGetAllCursor('/projects', 'v1') },
+    { label: 'v2 cursor', fn: () => pdGetAllCursor('/projects', 'v2') },
+    { label: 'v1 start/limit', fn: () => pdGetAllV1('/projects') },
   ];
-  let projectsRawSel = [], projUsed = null, projMax = -1;
+  let projectsRawSel = [], projUsed = null;
   for (const c of projCandidates) {
     try {
       const v = await c.fn();
-      if (Array.isArray(v) && v.length) {
-        const mx = Math.max(...v.map((p) => srvT(p.update_time) || srvT(p.add_time)));
-        if (mx > projMax) { projMax = mx; projectsRawSel = v; projUsed = c.label; }
-      }
+      if (Array.isArray(v) && v.length > projectsRawSel.length) { projectsRawSel = v; projUsed = c.label; }
     } catch (e) { errs['projects:' + c.label] = String((e && e.message) || e); }
   }
   // Déduplication de sécurité par id.

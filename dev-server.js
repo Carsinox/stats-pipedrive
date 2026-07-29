@@ -20,7 +20,6 @@ try {
 } catch (_) {}
 
 const dataHandler = require('./api/data');
-const projectsHandler = require('./api/projects');
 const riHandler = require('./api/ri');
 const discoverHandler = require('./api/discover');
 const loginHandler = require('./api/login');
@@ -34,9 +33,6 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname === '/api/data') {
     return dataHandler(req, res);
-  }
-  if (url.pathname === '/api/projects') {
-    return projectsHandler(req, res);
   }
   if (url.pathname === '/api/ri') {
     return riHandler(req, res);

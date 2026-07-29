@@ -110,19 +110,6 @@ const state={period:'month',ri:'all',raw:null};
 $('#themeBtn').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');const dark=c==='dark'||(c!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);const nx=dark?'light':'dark';document.documentElement.setAttribute('data-theme',nx);try{localStorage.setItem('pd_theme',nx);}catch(_){}if(state.raw)compute();};
 $('#logoutBtn').onclick=async()=>{try{await fetch('/api/logout',{method:'POST'});}catch(_){}location.href='/';};
 
-const ORD={attente_attribution:0,validation_garage:1,a_relancer:2,controle1:3,bdc:4,docs_cpi:5,tuv:6,paiement:7};
-function stepKey(name){
-  const n=norm(name);
-  if(/tuv/.test(n)) return 'tuv';
-  if(/paiement/.test(n)) return 'paiement';
-  if(/cpi/.test(n)) return 'docs_cpi';
-  if(/bdc/.test(n)) return 'bdc';
-  if(/contr.?le?\s*1|ctrl\s*1/.test(n)) return 'controle1';
-  if(/a\s*relancer|relancer/.test(n)) return 'a_relancer';
-  if(/validation|garage/.test(n)) return 'validation_garage';
-  if(/attribution|attente/.test(n)) return 'attente_attribution';
-  return null;
-}
 function parseD(s){ if(!s)return null; let x=String(s).trim().replace(' ','T'); if(x.length===10) x+='T00:00:00Z'; else if(!/[zZ]|[+\-]\d\d:?\d\d$/.test(x)) x+='Z'; const d=new Date(x); return isNaN(d)?null:d; }
 function periodStart(nowMs){ const d=new Date(nowMs);const back=state.period==='month'?0:state.period==='3m'?2:state.period==='6m'?5:11; return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()-back,1); }
 
