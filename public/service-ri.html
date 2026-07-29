@@ -150,11 +150,10 @@ function compute(){
   const pStart=periodStart(nowMs);
   const phMap=new Map();(d.phases||[]).forEach(p=>{const k=stepKey(p.name);phMap.set(Number(p.id),{key:k,ord:k?ORD[k]:null});});
   const collabs=(d.collaborators||[]);
-  const ftok=(s)=>norm(s).split(/[\s\-']/)[0];        // premier prénom, sans accent
-  const canon=new Map(collabs.map(c=>[ftok(c),c]));
+  const canon=new Map(collabs.map(c=>[norm(c),c]));   // correspondance par nom exact
   const riField=d.riField||'relation_garage';
   const cf=(p,k)=>p.custom_fields?p.custom_fields[k]:undefined;
-  const riOf=(p)=>canon.get(ftok(cf(p,riField)));
+  const riOf=(p)=>canon.get(norm(cf(p,riField)));
 
   // Un projet OUVERT compte toujours (c'est l'état actuel du service) ;
   // les projets terminés/annulés ne comptent que si leur date récente est dans la période.

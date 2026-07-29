@@ -57,23 +57,29 @@ module.exports = async (req, res) => {
     return { v: [], used: null };
   };
 
-  const [projRes, phaseRes, fieldDefs, users] = await Promise.all([
+  const [projRes, boardRes, fieldDefs, users] = await Promise.all([
     firstOk('projects', [
       { label: 'v1 /projects', fn: () => pdGetAllV1('/projects') },
       { label: 'v2 /projects', fn: () => pdGetAll('/projects') },
     ]),
-    firstOk('phases', [
-      { label: 'v1 /projects/phases', fn: () => pdGetAllV1('/projects/phases') },
-      { label: 'v1 /projectPhases', fn: () => pdGetAllV1('/projectPhases') },
-      { label: 'v2 /projects/phases', fn: () => pdGetAll('/projects/phases') },
+    firstOk('boards', [
       { label: 'v1 /projects/boards', fn: () => pdGetAllV1('/projects/boards') },
+      { label: 'v2 /projects/boards', fn: () => pdGetAll('/projects/boards') },
     ]),
     safe('projectFields', pdGetAll('/projectFields')),
     safe('users', pdGet('/users', {}, 'v1').then((r) => r.data || [])),
   ]);
   const projectsRaw = projRes.v;
-  const phasesRaw = phaseRes.v;
-  const endpointsUsed = { projects: projRes.used, phases: phaseRes.used };
+  const boards = boardRes.v || [];
+  // Les phases se récupèrent PAR board (l'endpoint exige un board_id).
+  let phasesRaw = [];
+  for (const bd of boards) {
+    try {
+      const ph = await pdGetAllV1('/projects/phases', { board_id: bd.id });
+      if (Array.isArray(ph)) phasesRaw = phasesRaw.concat(ph.map((x) => ({ id: x.id, name: x.name, board_id: bd.id })));
+    } catch (e) { errs['phases:board:' + bd.id] = String((e && e.message) || e); }
+  }
+  const endpointsUsed = { projects: projRes.used, boards: boardRes.used, boardsCount: boards.length };
 
   // Auto-détection du champ RI si la clé n'est pas dans les définitions récupérées.
   const defs = fieldDefs || [];
@@ -127,18 +133,26 @@ module.exports = async (req, res) => {
   const projects = projectsRaw.map((p) => ({
     id: p.id, title: p.title, deal_ids: p.deal_ids || [],
     status: p.status,
-    phase_id: idOf(p.stage_id != null ? p.stage_id : p.phase_id), // phase = stage_id (projects_phase)
-    board_id: idOf(p.pipeline_id != null ? p.pipeline_id : p.board_id),
+    phase_id: idOf(p.phase_id != null ? p.phase_id : p.stage_id), // la donnée projet expose "phase_id"
+    board_id: idOf(p.board_id != null ? p.board_id : p.pipeline_id),
     start_date: p.start_date || null, end_date: p.end_date || null,
     update_time: p.update_time || p.status_change_time || p.updated || null,
     custom_fields: { relation_garage: riLabel(cf(p, riField)) },
   }));
+
+  // Liste des RI présents dans les données (dynamique) : whoever a un projet avec "Relation Garage".
+  const foundRIs = [...new Set(projects.map((p) => p.custom_fields.relation_garage).filter((v) => v != null && String(v).trim() !== ''))]
+    .sort((a, b) => String(a).localeCompare(String(b), 'fr'));
 
   res.statusCode = 200;
   res.end(JSON.stringify({
     demo: false, generatedAt: new Date(nowMs).toISOString(),
     projects,
     phases: (phasesRaw || []).map((p) => ({ id: p.id, name: p.name })),
-    boards: [], collaborators: RI_COLLABS, riField,
+    boards: (boards || []).map((b) => ({ id: b.id, name: b.name })),
+    collaborators: foundRIs,          // RI réellement présents
+    knownCollabs: RI_COLLABS,         // les 6 souhaités (info)
+    riField: 'relation_garage',       // clé sous laquelle la valeur est exposée à la page
+    riSource: riField,                // clé Pipedrive réelle (info)
   }));
 };
