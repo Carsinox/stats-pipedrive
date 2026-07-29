@@ -64,9 +64,7 @@ async function pdGetAllV1(path, params = {}) {
     const page = await pdGet(path, { ...params, start, limit: PAGE_LIMIT }, 'v1');
     if (Array.isArray(page.data)) out = out.concat(page.data);
     const more = page.additional_data && page.additional_data.pagination;
-    const dataLen = Array.isArray(page.data) ? page.data.length : 0;
-    if (more && more.more_items_in_collection) start = more.next_start;
-    else if (dataLen >= PAGE_LIMIT) start += PAGE_LIMIT; // page pleine sans métadonnée de pagination -> on continue
+    if (more && more.more_items_in_collection && Number.isFinite(more.next_start) && more.next_start > start) start = more.next_start;
     else break;
   }
   return out;

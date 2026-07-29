@@ -59,6 +59,9 @@ module.exports = async (req, res) => {
 
   const [projRes, boardRes, fieldDefs, users] = await Promise.all([
     firstOk('projects', [
+      // On veut les projets RÉCENTS (l'API renvoie sinon les 500 plus anciens = ex-collaborateurs).
+      { label: 'v1 /projects sort update_time DESC', fn: () => pdGetAllV1('/projects', { sort: 'update_time DESC' }) },
+      { label: 'v1 /projects sort add_time DESC', fn: () => pdGetAllV1('/projects', { sort: 'add_time DESC' }) },
       { label: 'v1 /projects', fn: () => pdGetAllV1('/projects') },
       { label: 'v2 /projects', fn: () => pdGetAll('/projects') },
     ]),
@@ -69,7 +72,9 @@ module.exports = async (req, res) => {
     safe('projectFields', pdGetAll('/projectFields')),
     safe('users', pdGet('/users', {}, 'v1').then((r) => r.data || [])),
   ]);
-  const projectsRaw = projRes.v;
+  // Déduplication de sécurité par id (au cas où la pagination renverrait des doublons).
+  const seenIds = new Set();
+  const projectsRaw = (projRes.v || []).filter((p) => { const k = p && p.id; if (k == null) return true; if (seenIds.has(k)) return false; seenIds.add(k); return true; });
   const boards = boardRes.v || [];
   // Les phases se récupèrent PAR board (l'endpoint exige un board_id).
   let phasesRaw = [];
@@ -110,6 +115,9 @@ module.exports = async (req, res) => {
     const ftok = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[\s\-']/)[0];
     const riToks = new Set(riMapped.map(ftok));
     const matched6 = RI_COLLABS.filter((c) => riToks.has(ftok(c)));
+    const parseT = (s) => { if (!s) return null; const d = new Date(String(s).replace(' ', 'T')); return isNaN(d) ? null : d.getTime(); };
+    const range = (arr) => { const a = arr.filter((v) => v != null); return a.length ? { min: new Date(Math.min(...a)).toISOString().slice(0, 10), max: new Date(Math.max(...a)).toISOString().slice(0, 10) } : null; };
+    const dateRange = { add_time: range(raw.map((p) => parseT(p.add_time))), update_time: range(raw.map((p) => parseT(p.update_time))) };
     res.setHeader('Cache-Control', 'no-store');
     res.statusCode = 200;
     res.end(JSON.stringify({
@@ -117,6 +125,7 @@ module.exports = async (req, res) => {
       endpointsUsed,
       errors: errs,
       counts: { projects: raw.length, phases: (phasesRaw || []).length, projectFields: defs.length, users: (users || []).length },
+      dateRange,
       phaseNames: (phasesRaw || []).map((p) => ({ id: p.id, name: p.name, order_nr: p.order_nr })),
       sampleProjectKeys: Object.keys(sample),
       sampleProject: { status: sample.status, stage_id: sample.stage_id, phase_id: sample.phase_id, update_time: sample.update_time, ri_raw: cf(sample, riField), ri_mapped: riLabel(cf(sample, riField)) },
@@ -155,7 +164,7 @@ module.exports = async (req, res) => {
     phases: (phasesRaw || []).map((p) => ({ id: p.id, name: p.name, order_nr: p.order_nr })),
     boards: (boards || []).map((b) => ({ id: b.id, name: b.name })),
     collaborators: RI_COLLABS,        // on garde uniquement les 6 RI
-    foundRIs,                         // tous les RI présents dans les données (info)
+    foundRIs,                         // tous les RI présents (info)
     riField: 'relation_garage',       // clé sous laquelle la valeur est exposée à la page
     riSource: riField,                // clé Pipedrive réelle (info)
   }));
