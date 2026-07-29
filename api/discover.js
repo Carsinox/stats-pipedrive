@@ -82,13 +82,16 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const [pipelines, dealFields, personFields, activityFields, activityTypesRaw] = await Promise.all([
+    const [pipelines, dealFields, personFields, activityFields, activityTypesRaw, projectFields] = await Promise.all([
       pdGetAll('/pipelines').catch(() => []),
       pdGetAllV1('/dealFields').catch(() => []),
       pdGetAllV1('/personFields').catch(() => []),
       pdGetAllV1('/activityFields').catch(() => []),
       pdGet('/activityTypes', {}, 'v1').then((r) => r.data).catch(() => []),
+      pdGetAllV1('/projectFields').catch(() => []), // champs du module Projects (Service RI)
     ]);
+    // --- détection du champ "Relation Garage" (champ de PROJET) ---
+    const guessRI = (projectFields || []).find((f) => /relation\s*garage|garage/i.test(f.name || ''));
 
     const dateFields = (dealFields || []).filter((f) => ['date', 'daterange'].includes(f.field_type));
 
@@ -117,7 +120,8 @@ PIPEDRIVE_MANDAT_DATE_FIELD=${guessMandat ? guessMandat.key : 'REMPLACER'}
 PIPEDRIVE_CE_FIELD=${ce ? ce.field.key : 'REMPLACER'}
 PIPEDRIVE_CE_VALUES=${ce && ce.option ? ce.option.id : 'REMPLACER'}
 PIPEDRIVE_CE_DATE_FIELD=${guessCeDate ? guessCeDate.key : '(créer le champ + automatisation — voir guide)'}
-PIPEDRIVE_MANDAT_VALUE=500`;
+PIPEDRIVE_MANDAT_VALUE=500
+PIPEDRIVE_RI_FIELD=${guessRI ? guessRI.key : 'REMPLACER (voir « Champs de PROJET » plus bas)'}`;
 
     const detected = guessMandat && ce && ce.option;
     const rows = (arr, cols) => (arr || []).map((r) => `<tr>${cols.map((c) => `<td>${c(r)}</td>`).join('')}</tr>`).join('');
@@ -131,6 +135,19 @@ PIPEDRIVE_MANDAT_VALUE=500`;
         <pre>${esc(suggest)}</pre>
         ${ce ? `<p class="muted">Champ « résultat d'appel » détecté. Le CE est compté automatiquement sur les <b>leads (prospects) ET les affaires</b>, avec déduplication.</p>` : ''}
         <a class="btn" href="/">← Retour au dashboard</a>
+      </div>
+
+      <h2>Champs de PROJET <span class="pill">PIPEDRIVE_RI_FIELD (Service RI)</span></h2>
+      <div class="card">
+        <p class="muted" style="margin-top:0">Repérez le champ « Relation Garage » et copiez sa <b>clé</b> dans <code>PIPEDRIVE_RI_FIELD</code>. Aucune automatisation nécessaire.</p>
+        ${(projectFields && projectFields.length) ? `<table><tr><th>Clé (key)</th><th>Nom</th><th>Type</th></tr>
+          ${rows(projectFields, [
+            (f) => `<span class="key">${esc(f.key)}</span>${guessRI && f.key === guessRI.key ? ' <span class="ok">← Relation Garage</span>' : ''}`,
+            (f) => esc(f.name),
+            (f) => `<span class="muted">${esc(f.field_type || '')}</span>`])}
+        </table>
+        ${guessRI && ['enum', 'set'].includes(guessRI.field_type) && Array.isArray(guessRI.options) ? `<p style="margin:12px 0 4px"><b>Options de « ${esc(guessRI.name)} »</b> (les RI) :</p><table>${guessRI.options.map((o) => `<tr><td>option id <span class="key">${esc(o.id)}</span></td><td>${esc(o.label)}</td></tr>`).join('')}</table>` : ''}`
+        : `<p class="warn">Aucun champ de projet retourné par l'API. Vérifiez que le module Projects est activé et que votre token y a accès.</p>`}
       </div>
 
       <h2>Pipelines <span class="pill">PIPEDRIVE_PIPELINES (optionnel)</span></h2>
