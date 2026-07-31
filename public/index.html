@@ -196,6 +196,38 @@
   .modal .empty{color:var(--muted);font-size:13px;padding:14px 0}
   .modal .mbody{max-height:60vh;overflow:auto}
 
+  /* ---------- Export fiches vendeur ---------- */
+  .rank-topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .rank-topbar h2{margin:0}
+  .exp-open{cursor:pointer;border:1px solid color-mix(in srgb,var(--s-ce) 45%,var(--border));background:color-mix(in srgb,var(--s-ce) 12%,var(--surface));
+    color:var(--s-ce);border-radius:10px;padding:8px 14px;font-size:12.5px;font-weight:800;letter-spacing:.02em;display:inline-flex;align-items:center;gap:7px;
+    transition:transform .1s,background .15s,box-shadow .15s;white-space:nowrap}
+  .exp-open:hover{background:color-mix(in srgb,var(--s-ce) 20%,var(--surface));box-shadow:var(--shadow)}
+  .exp-open:active{transform:scale(.96)}
+  #expModal .modal{max-width:900px}
+  .exp-actions{display:flex;justify-content:flex-end;margin:2px 0 12px}
+  .exp-dl{cursor:pointer;border:0;border-radius:11px;padding:10px 18px;font-size:13px;font-weight:800;letter-spacing:.02em;color:#fff;
+    background:linear-gradient(120deg,var(--brand-ink),var(--brand-2));box-shadow:var(--shadow);display:inline-flex;align-items:center;gap:8px;
+    transition:transform .1s,filter .15s}
+  .exp-dl:hover{filter:brightness(1.08)} .exp-dl:active{transform:scale(.97)}
+  .exp-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+  .exp-table thead th{position:sticky;top:0;z-index:1;background:linear-gradient(120deg,var(--brand-ink),var(--brand-2));color:#fff;
+    font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:10px 9px;text-align:right;white-space:nowrap}
+  .exp-table thead th:nth-child(1){text-align:center;border-radius:10px 0 0 0}
+  .exp-table thead th:nth-child(2){text-align:left}
+  .exp-table thead th:last-child{border-radius:0 10px 0 0}
+  .exp-table tbody td{padding:9px 9px;border-bottom:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .exp-table tbody tr:nth-child(even) td{background:var(--surface-2)}
+  .exp-table tbody tr:hover td{background:color-mix(in srgb,var(--s-ce) 9%,var(--surface))}
+  .exp-table td.nm{text-align:left;font-weight:800}
+  .exp-table td.rkc{text-align:center;width:1%}
+  .exp-rk{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;border-radius:8px;font-size:12.5px;font-weight:900;padding:0 7px;color:#22303a;background:var(--surface-2);border:1px solid var(--border)}
+  .exp-rk.g1{background:linear-gradient(135deg,#F4D03F,#D4AF37);border-color:#D4AF37;color:#4a3b00}
+  .exp-rk.g2{background:linear-gradient(135deg,#E2E8F0,#A8B4C0);border-color:#A8B4C0;color:#2a3540}
+  .exp-rk.g3{background:linear-gradient(135deg,#E8B98A,#CD7F32);border-color:#CD7F32;color:#4a2c0d}
+  .exp-pill{display:inline-block;min-width:52px;padding:3px 9px;border-radius:999px;font-weight:800;font-size:12.5px}
+  .exp-sep{color:var(--border)}
+
   .tt{position:fixed;pointer-events:none;z-index:35;background:var(--brand-ink);color:#fff;
     font-size:12px;padding:8px 11px;border-radius:9px;opacity:0;transition:opacity .1s;box-shadow:var(--shadow-lg);white-space:nowrap}
   .tt b{font-weight:700}
@@ -347,7 +379,13 @@
 
     <!-- Classement général -->
     <div class="card rank-card">
-      <h2>Classement général <span class="rank-sub" id="rankPeriod"></span></h2>
+      <div class="rank-topbar">
+        <h2>Classement général <span class="rank-sub" id="rankPeriod"></span></h2>
+        <button class="exp-open" id="expOpen" title="Exporter les fiches vendeur en CSV">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.3V4a1 1 0 0 1 1-1ZM5 19a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1Z"/></svg>
+          Export CSV
+        </button>
+      </div>
       <div class="rank-cols">
         <div class="rank-col">
           <div class="rank-head"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="#A8B4C0" d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0 0 11 18.9V21H8v2h8v-2h-3v-2.1a5.01 5.01 0 0 0 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/></svg> Mandats rentrés</div>
@@ -407,6 +445,19 @@
     <h3 id="ceTitle">Détail</h3>
     <p class="msub" id="ceSub"></p>
     <div id="ceBody" class="mbody"></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="expModal">
+  <div class="modal">
+    <button class="close" id="expClose" title="Fermer">×</button>
+    <h3>Fiches vendeur — export</h3>
+    <p class="msub" id="expSub"></p>
+    <div class="exp-actions"><button class="exp-dl" id="expDl">
+      <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.3V4a1 1 0 0 1 1-1ZM5 19a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1Z"/></svg>
+      Télécharger le CSV
+    </button></div>
+    <div class="mbody" id="expBody"></div>
   </div>
 </div>
 
@@ -861,6 +912,99 @@ function openDetail(kind){
 });
 $('#ceClose').onclick=()=>$('#ceModal').classList.remove('on');
 $('#ceModal').addEventListener('click',(e)=>{if(e.target.id==='ceModal')$('#ceModal').classList.remove('on');});
+
+// ---------- Export CSV des fiches vendeur (une ligne = un commercial) ----------
+// Le tableau et le CSV reflètent les filtres en cours (pipeline + mois).
+//  • Sans mois sélectionné : « semaine » et « mois » = semaine / mois en cours.
+//  • Avec un mois sélectionné : « mois » = ce mois, « semaine » = — (sans objet pour un mois passé).
+// Couleur du taux d'annulation par palier (identique à la tuile), rang podium or/argent/bronze.
+function annulColor(rate){
+  return rate==null?'var(--muted)':rate<10?'var(--good)':rate<20?'var(--brand-2)':rate<=30?'#EE9A34':'#FF2D2D';
+}
+function transfoColor(rate){ // % = mandats/mois ÷ CE/mois ; plus c'est haut, mieux c'est
+  return rate==null?'var(--muted)':rate>=12?'var(--good)':rate>=7?'var(--brand-2)':rate>=3?'#EE9A34':'#FF2D2D';
+}
+function buildExportRows(){
+  const raw=state.raw; if(!raw) return [];
+  const nowMs=Date.parse(raw.generatedAt)||Date.now();
+  const month=state.month||undefined;
+  const rk=window.PDStats.ranking(raw, state.mapping, {nowMs, month});
+  const rankPos=new Map(rk.mandats.map((x,i)=>[Number(x.id),i+1]));
+  const users=(raw.users||[]).filter(u=>isCommercial(u.name));
+  const rows=users.map(u=>{
+    const s=window.PDStats.computeStats(raw, state.mapping, {nowMs, gran:'week', ownerId:Number(u.id), month});
+    const k=s.kpis;
+    const annul=k.mandats.month>0 ? k.remboursementsCount/k.mandats.month*100 : null;
+    const transfo=k.tauxTransfo==null ? null : k.tauxTransfo*100;
+    return { name:u.name,
+      ceW:k.ce.week, ceM:k.ce.month, maW:k.mandats.week, maM:k.mandats.month,
+      remb:k.remboursementsCount, annul, transfo, rank:rankPos.get(Number(u.id))||null };
+  });
+  // Classés d'abord (rang croissant), puis les autres par mandats du mois décroissant, puis nom.
+  rows.sort((a,b)=>{
+    if(a.rank&&b.rank) return a.rank-b.rank;
+    if(a.rank) return -1; if(b.rank) return 1;
+    return (b.maM-a.maM) || String(a.name).localeCompare(String(b.name),'fr');
+  });
+  return rows;
+}
+function renderExport(){
+  if(!state.raw||!state.mapping) return;
+  const rows=buildExportRows();
+  const monthMode=!!state.month;
+  const plabel=monthMode?monthLabelFr(state.month):'mois en cours';
+  const pipeName=state.pipeline==='all'?'Tous les pipelines':((($('#pipelineSel').selectedOptions[0]||{}).textContent)||'');
+  $('#expSub').textContent=`${nf.format(rows.length)} commerciaux · ${monthMode?plabel:'semaine + mois en cours'} · ${pipeName}`;
+  const dash='<span class="exp-sep">—</span>';
+  const num=(v)=> v==null?dash:nf.format(v);
+  const wk=(v)=> monthMode?dash:nf.format(v);
+  const pct=(v,color)=> v==null?dash:`<span class="exp-pill" style="color:${color};background:color-mix(in srgb,${color} 15%,transparent)">${nf1.format(v)}&nbsp;%</span>`;
+  const body=$('#expBody');
+  if(!rows.length){ body.innerHTML='<div class="empty">Aucun commercial avec les filtres actuels.</div>'; }
+  else{
+    body.innerHTML='<table class="exp-table"><thead><tr>'+
+      '<th>Rang</th><th>Commercial</th><th>CE&nbsp;sem.</th><th>CE&nbsp;mois</th><th>Mand.&nbsp;sem.</th><th>Mand.&nbsp;mois</th><th>Taux&nbsp;annul.</th><th>Taux&nbsp;transfo</th>'+
+      '</tr></thead><tbody>'+
+      rows.map(r=>{
+        const rb = r.rank ? `<span class="exp-rk ${r.rank<=3?'g'+r.rank:''}">${r.rank}</span>` : `<span class="exp-rk">${dash}</span>`;
+        return `<tr>`+
+          `<td class="rkc">${rb}</td>`+
+          `<td class="nm" style="color:${genderColor(r.name)}">${escapeHtml(r.name)}</td>`+
+          `<td>${wk(r.ceW)}</td>`+
+          `<td>${num(r.ceM)}</td>`+
+          `<td>${wk(r.maW)}</td>`+
+          `<td>${num(r.maM)}</td>`+
+          `<td>${pct(r.annul,annulColor(r.annul))}</td>`+
+          `<td>${pct(r.transfo,transfoColor(r.transfo))}</td>`+
+        `</tr>`;
+      }).join('')+'</tbody></table>';
+  }
+  $('#expModal').classList.add('on');
+}
+function downloadExportCSV(){
+  const rows=buildExportRows();
+  const monthMode=!!state.month;
+  const csvNum=(v)=> v==null?'':String(v);
+  const wk=(v)=> monthMode?'':String(v);
+  const csvPct=(v)=> v==null?'':nf1.format(v).replace('.',',')+' %';
+  const q=(s)=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+  const header=['Rang','Commercial','CE semaine','CE mois','Mandat semaine','Mandat mois','Remboursements mois','Taux annulation','Taux transformation'];
+  const lines=[header.join(';')];
+  rows.forEach(r=>{
+    lines.push([ r.rank||'', q(r.name), wk(r.ceW), csvNum(r.ceM), wk(r.maW), csvNum(r.maM), csvNum(r.remb), csvPct(r.annul), csvPct(r.transfo) ].join(';'));
+  });
+  const plabel=monthMode?monthLabelFr(state.month).replace(/\s+/g,'-'):'mois-en-cours';
+  const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='fiches-vendeur_'+plabel+'.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+$('#expOpen').onclick=renderExport;
+$('#expDl').onclick=downloadExportCSV;
+$('#expClose').onclick=()=>$('#expModal').classList.remove('on');
+$('#expModal').addEventListener('click',(e)=>{if(e.target.id==='expModal')$('#expModal').classList.remove('on');});
 
 // ---------- champ objectif ----------
 const objInput=$('#objInput');

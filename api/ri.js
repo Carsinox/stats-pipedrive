@@ -223,6 +223,7 @@ module.exports = async (req, res) => {
       status: p.status,
       phase_id: idOf(p.phase_id != null ? p.phase_id : p.stage_id), // la donnée projet expose "phase_id"
       board_id: idOf(p.board_id != null ? p.board_id : p.pipeline_id),
+      add_time: p.add_time || null, // date de création (cohorte du taux de transformation)
       start_date: p.start_date || null, end_date: p.end_date || null,
       update_time: p.update_time || p.status_change_time || p.updated || null,
       status_change_time: p.status_change_time || null, // date du dernier changement de statut (annulation)
