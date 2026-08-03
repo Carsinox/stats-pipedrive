@@ -197,7 +197,8 @@ function compute(){
   const list = state.ri==='all' ? all : all.filter(p=>p.ri===state.ri);
 
   const atOpen=(id)=>list.filter(p=>id!=null && p.pid===id && p.status==='open'); // ouverts, à l'étape courante
-  const enCours=list.filter(p=>p.status==='open');
+  // Projets en cours = ouverts dans la plage « Validation garage » → « Attente doc CPI » (zone active du RI).
+  const enCours=list.filter(p=> p.status==='open' && validIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=validIdx && p.idx<=cpiIdx);
   const attente=atOpen(arP?Number(arP.id):null);
   const bdc=atOpen(bdcP?Number(bdcP.id):null);
   const paiement=atOpen(paieP?Number(paieP.id):null);
@@ -218,23 +219,22 @@ function compute(){
   const inDelai=(p)=> p.status==='open' && validIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=validIdx && p.idx<=cpiIdx;
   const dels=list.filter(inDelai).map(p=>p.updMs?bizHours(p.updMs,nowMs):null).filter(v=>v!=null&&v>=0);
   const delai=dels.length? dels.reduce((a,b)=>a+b,0)/dels.length : null;
-  // Taux de transformation (photo des projets encore ouverts) :
-  //   parmi les projets EN COURS, la part de ceux arrivés à « Attente doc CPI » ou au-delà.
-  //   Dénominateur = projets ouverts (annulés et terminés exclus).  Numérateur = ouverts dont phase ≥ CPI.
-  //   (Pas d'historique de phase dans Pipedrive : on se base sur la phase actuelle, fiable car le cycle avance dans un seul sens.)
-  const atteintCPI = list.filter(p=> p.status==='open' && cpiIdx!=null && p.idx!=null && p.idx>=cpiIdx);
+  // Taux de transformation (même entonnoir que « Projets en cours ») :
+  //   parmi les projets EN COURS (ouverts, Validation garage → Attente doc CPI), la part arrivée à CPI.
+  //   Numérateur = sous-ensemble des « en cours » situés à « Attente doc CPI » (fin de la plage).
+  const atteintCPI = enCours.filter(p=> cpiIdx!=null && p.idx!=null && p.idx>=cpiIdx);
   const transfo = enCours.length>0 ? atteintCPI.length/enCours.length*100 : null;
   const tauxCol = taux==null?'var(--muted)':taux>=30?'#D9534F':taux>=15?'#EE9A34':'#1F9D57';
   const delaiCol = delai==null?'var(--muted)':delai>24?'#D9534F':'#1F9D57';
 
   renderRi([
-    {label:'Projets en cours', value:nf.format(enCours.length), accent:'var(--brand)', items:enCours},
+    {label:'Projets en cours', value:nf.format(enCours.length), accent:'var(--brand)', items:enCours, foot:'de Validation garage à Attente doc CPI'},
     {label:'En attente de traitement', value:nf.format(attente.length), accent:'var(--s-r2)', items:attente},
     {label:'BDC obtenus', value:nf.format(bdc.length), accent:'var(--s-ce)', items:bdc},
     {label:'Paiement total', value:nf.format(paiement.length), accent:'var(--s-mandat)', items:paiement},
     {label:'Attente doc CPI', value:nf.format(docs.length), accent:'#EE9A34', items:docs},
     {label:"Taux d'annulation", value: taux==null?'—':nf1.format(taux)+' %', accent:tauxCol, color:tauxCol, items:null, foot:'🔄 remis à zéro le 1er du mois'},
-    {label:'Taux de transformation', value: transfo==null?'—':nf1.format(transfo)+' %', accent:'var(--s-ce)', items:atteintCPI, foot:'projets en cours arrivés à CPI ou +'},
+    {label:'Taux de transformation', value: transfo==null?'—':nf1.format(transfo)+' %', accent:'var(--s-ce)', items:atteintCPI, foot:'en cours arrivés à CPI'},
     {label:'Délai de réponse', value: delai==null?'—':nf.format(Math.round(delai))+' h', accent:delaiCol, color:delaiCol, items:null},
   ]);
 }
