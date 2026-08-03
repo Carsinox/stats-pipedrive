@@ -121,11 +121,11 @@ $('#themeBtn').onclick=()=>{const c=document.documentElement.getAttribute('data-
 $('#logoutBtn').onclick=async()=>{try{await fetch('/api/logout',{method:'POST'});}catch(_){}try{localStorage.removeItem('ri_data');localStorage.removeItem('ri_data_ts');}catch(_){}location.href='/';};
 
 function parseD(s){ if(!s)return null; let x=String(s).trim().replace(' ','T'); if(x.length===10) x+='T00:00:00Z'; else if(!/[zZ]|[+\-]\d\d:?\d\d$/.test(x)) x+='Z'; const d=new Date(x); return isNaN(d)?null:d; }
-// Heures OUVRÉES entre deux dates : lundi→vendredi, 9h–18h (heure locale). Week-ends et hors 9-18 exclus.
+// Heures OUVRÉES entre deux dates : lundi→vendredi, 9h–19h (heure locale). Week-ends et hors 9-19 exclus.
 function bizHours(startMs,endMs){
   if(!(endMs>startMs)) return 0;
   if(endMs-startMs > 45*86400000) return 999; // au-delà de ~45 j : de toute façon très en retard
-  const H0=9,H1=18; let total=0;
+  const H0=9,H1=19; let total=0;
   const day=new Date(startMs); day.setHours(0,0,0,0);
   while(day.getTime()<endMs){
     const dow=day.getDay(); // 0=dim, 6=sam
@@ -226,8 +226,15 @@ function compute(){
   const transfo = enCours.length>0 ? atteintCPI.length/enCours.length*100 : null;
   const tauxCol = taux==null?'var(--muted)':taux>=30?'#D9534F':taux>=15?'#EE9A34':'#1F9D57';
   const delaiCol = delai==null?'var(--muted)':delai>24?'#D9534F':'#1F9D57';
+  // Dossiers prioritaires : projets EN COURS (Validation garage → Attente doc CPI) sans aucun signal
+  //   du RI (note, champ modifié, changement de phase) depuis plus de 48 h ouvrées (lun–ven 9h–19h).
+  //   updMs = resp_time = max(update_time, status_change_time, dernière note du RI) — calculé côté serveur.
+  const PRIO_H=48;
+  const prioritaires=enCours.filter(p=> p.updMs==null || bizHours(p.updMs,nowMs)>PRIO_H);
+  const prioCol = prioritaires.length>0 ? '#D9534F' : '#1F9D57';
 
   renderRi([
+    {label:'Dossiers prioritaires', value:nf.format(prioritaires.length), accent:prioCol, color:prioCol, items:prioritaires, foot:'pas de réponse depuis plus de 48h'},
     {label:'Projets en cours', value:nf.format(enCours.length), accent:'var(--brand)', items:enCours, foot:'de Validation garage à Attente doc CPI'},
     {label:'En attente de traitement', value:nf.format(attente.length), accent:'var(--s-r2)', items:attente},
     {label:'BDC obtenus', value:nf.format(bdc.length), accent:'var(--s-ce)', items:bdc},
