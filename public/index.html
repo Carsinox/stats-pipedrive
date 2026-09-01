@@ -834,15 +834,19 @@ function applyData(d){
   // Retire les non-commerciaux (managers, admin, etc.) partout : liste déroulante + classement.
   if(Array.isArray(d.users)) d.users=d.users.filter(u=>isCommercial(u.name));
   state.raw=d;
+  // Menus reconstruits à chaque données reçues (sinon un pipeline/commercial arrivé après le
+  // 1er affichage — instantané en cache — ne s'ajouterait jamais). La sélection en cours est préservée.
   const sel=$('#pipelineSel');
-  if(sel.dataset.filled!=='1'&&d.pipelines&&d.pipelines.length){
-    d.pipelines.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);});
-    sel.dataset.filled='1';sel.value=state.pipeline;
+  if(d.pipelines&&d.pipelines.length){
+    const cur=sel.value;
+    sel.innerHTML='<option value="all">Tous les pipelines</option>'+d.pipelines.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    sel.value=[...sel.options].some(o=>o.value===cur)?cur:state.pipeline;
   }
   const usel=$('#userSel');
-  if(usel.dataset.filled!=='1'&&d.users&&d.users.length){
-    d.users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.name;o.style.color=genderColor(u.name);o.style.fontWeight='600';usel.appendChild(o);});
-    usel.dataset.filled='1';usel.value=state.user;
+  if(d.users&&d.users.length){
+    const cur=usel.value;
+    usel.innerHTML='<option value="all">Tous les commerciaux</option>'+d.users.map(u=>`<option value="${u.id}" style="color:${genderColor(u.name)};font-weight:600">${escapeHtml(u.name)}</option>`).join('');
+    usel.value=[...usel.options].some(o=>o.value===cur)?cur:state.user;
   }
   const msel=$('#monthSel');
   if(msel.dataset.filled!=='1'){

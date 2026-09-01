@@ -248,7 +248,12 @@ function compute(){
 
 function fillRi(d){
   const sel=$('#riSel');
-  if(sel.dataset.filled!=='1'&&d.collaborators){ d.collaborators.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);}); sel.dataset.filled='1'; }
+  if(!d.collaborators) return;
+  // Reconstruit le menu à chaque données reçues (sinon un nouveau RI arrivé après le 1er
+  // affichage — instantané en cache — ne s'ajouterait jamais). On préserve la sélection en cours.
+  const cur=sel.value;
+  sel.innerHTML='<option value="all">Tous les RI</option>'+d.collaborators.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  sel.value=[...sel.options].some(o=>o.value===cur)?cur:'all';
 }
 $('#riSel').onchange=(e)=>{state.ri=e.target.value;compute();};
 
