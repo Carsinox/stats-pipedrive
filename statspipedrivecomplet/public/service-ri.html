@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Service RI · VPA</title>
+<style>
+  :root{
+    --brand:#859CB6; --brand-2:#6C87A4; --brand-ink:#2A3B4E; --brand-soft:#EAEFF5;
+    --page:#EEF2F7; --surface:#FFFFFF; --surface-2:#F3F6FA;
+    --text-primary:#1B2733; --text-secondary:#5C6B7A; --muted:#94A2B0;
+    --grid:#E5EBF1; --baseline:#CBD5E0; --border:rgba(42,59,78,.10);
+    --good:#1F9D57; --warn:#C77B18; --critical:#D9534F;
+    --s-ce:#4C9BE0; --s-r2:#7C6CD6; --s-mandat:#2FA37A;
+  }
+  [data-theme="dark"]{
+    --brand:#94ABC6; --brand-2:#7C97B5; --brand-ink:#0F1A26; --brand-soft:#1B2836;
+    --page:#0E141B; --surface:#172230; --surface-2:#1E2C3B;
+    --text-primary:#EAF1F8; --text-secondary:#A7B6C4; --muted:#6E7F90;
+    --grid:#223141; --baseline:#324556; --border:rgba(255,255,255,.09);
+    --good:#2CB86A; --warn:#E0A23A; --critical:#E8706B;
+    --s-ce:#5AA9EC; --s-r2:#9385E0; --s-mandat:#3EBB8E;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--page);color:var(--text-primary)}
+  .appbar{position:sticky;top:0;z-index:25;background:linear-gradient(120deg,var(--brand-ink),var(--brand-2));box-shadow:0 2px 14px rgba(0,0,0,.14)}
+  .appbar-inner{max-width:1180px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:14px}
+  .logo-img{height:40px;width:auto;flex:none;display:block}
+  .brand-title{color:#fff;font-weight:800;font-size:17px;line-height:1.1}
+  .sub{color:rgba(255,255,255,.72);font-size:12px}
+  .appbar-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .navlink{color:#fff;text-decoration:none;font-size:13.5px;font-weight:700;padding:8px 12px;border-radius:9px;background:rgba(255,255,255,.12)}
+  .navlink.ghost{background:transparent;border:1px solid rgba(255,255,255,.28)}
+  .icon-btn{background:rgba(255,255,255,.12);border:none;color:#fff;width:36px;height:36px;border-radius:9px;cursor:pointer;font-size:15px}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 18px 60px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+  select{appearance:none;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:11px 34px 11px 13px;font-size:14px;color:var(--text-primary);cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%237C8A99' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");background-repeat:no-repeat;background-position:right 12px center}
+  h2{font-size:15px;margin:22px 0 12px}
+  .hint{font-size:12.5px;color:var(--muted);font-weight:500}
+  .grid{display:grid;gap:14px}
+  .g5{grid-template-columns:repeat(5,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+  .bubble{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px 18px 16px;box-shadow:0 1px 2px rgba(16,31,45,.05);position:relative;overflow:hidden}
+  .bubble::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--accent,var(--brand))}
+  .bubble .blab{font-size:12.5px;color:var(--text-secondary);font-weight:650;line-height:1.3;min-height:32px}
+  .bubble .bval{font-size:34px;font-weight:850;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1}
+  .bubble .bfoot{font-size:11.5px;color:var(--muted);margin-top:5px}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800}
+  .demo-badge{display:none;background:#FFE9A8;color:#7A5B00;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800}
+  .status{padding:40px;text-align:center;color:var(--text-secondary)}
+  .spin{width:26px;height:26px;border:3px solid var(--grid);border-top-color:var(--brand);border-radius:50%;display:inline-block;animation:sp .8s linear infinite;vertical-align:middle;margin-right:8px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .ri-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .ri-chip{font-size:13px;font-weight:800;padding:5px 13px;border-radius:999px;background:var(--brand-soft);color:var(--brand-ink)}
+  .note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.55}
+  .bubble.clickable{cursor:pointer;transition:transform .1s,box-shadow .1s}
+  .bubble.clickable:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(16,31,45,.12)}
+  .bmore{margin-top:8px;font-size:11px;font-weight:700;color:var(--brand-2)}
+  .modal-ov{position:fixed;inset:0;z-index:60;background:rgba(15,26,38,.42);display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-ov.on{display:flex}
+  .modal{background:var(--surface);border-radius:18px;max-width:520px;width:100%;max-height:80vh;display:flex;flex-direction:column;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.4);position:relative}
+  .modal h3{margin:0 30px 2px 0;font-size:17px}
+  .modal .msub{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+  .modal .close{position:absolute;top:14px;right:16px;border:none;background:transparent;font-size:24px;line-height:1;color:var(--muted);cursor:pointer}
+  .mbody{overflow:auto}
+  .mbody table{border-collapse:collapse;width:100%;font-size:13.5px}
+  .mbody td{padding:8px 6px;border-bottom:1px solid var(--grid)}
+  .mbody .empty{color:var(--muted);padding:16px;text-align:center}
+  @media(max-width:900px){.g5,.g4{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="appbar">
+  <div class="appbar-inner">
+    <img class="logo-img" src="logo.png" alt="VPA" />
+    <div>
+      <div class="brand-title">Service RI</div>
+      <div class="sub" id="subline">Chargement…</div>
+    </div>
+    <div class="appbar-actions">
+      <a class="navlink" href="/">← Ventes</a>
+      <button class="icon-btn" id="refreshBtn" title="Actualiser">↻</button>
+      <button class="icon-btn" id="themeBtn" title="Thème">◐</button>
+      <button class="icon-btn" id="logoutBtn" title="Se déconnecter" style="display:none">⎋</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="content" style="display:none">
+    <h2 class="ri-head">Détail par RI
+      <select id="riSel" title="Relation Garage" style="margin-left:4px"><option value="all">Tous les RI</option></select>
+    </h2>
+    <div class="grid g4" id="riGrid"></div>
+
+    <div class="note" id="riNote"></div>
+  </div>
+
+  <div class="status" id="statusBox"><span class="spin"></span>Chargement du Service RI…</div>
+</div>
+
+<div class="modal-ov" id="riModal">
+  <div class="modal">
+    <button class="close" id="riClose" title="Fermer">×</button>
+    <h3 id="riMTitle">Détail</h3>
+    <div class="msub" id="riMSub"></div>
+    <div id="riMBody" class="mbody"></div>
+  </div>
+</div>
+
+<script>
+const $=(s)=>document.querySelector(s);
+const nf=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
+const nf1=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1});
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=(s)=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+const state={ri:'all',raw:null};
+
+(function(){const t=localStorage.getItem('pd_theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
+$('#themeBtn').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');const dark=c==='dark'||(c!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);const nx=dark?'light':'dark';document.documentElement.setAttribute('data-theme',nx);try{localStorage.setItem('pd_theme',nx);}catch(_){}if(state.raw)compute();};
+$('#logoutBtn').onclick=async()=>{try{await fetch('/api/logout',{method:'POST'});}catch(_){}try{localStorage.removeItem('ri_data');localStorage.removeItem('ri_data_ts');}catch(_){}location.href='/';};
+
+function parseD(s){ if(!s)return null; let x=String(s).trim().replace(' ','T'); if(x.length===10) x+='T00:00:00Z'; else if(!/[zZ]|[+\-]\d\d:?\d\d$/.test(x)) x+='Z'; const d=new Date(x); return isNaN(d)?null:d; }
+// Heures OUVRÉES entre deux dates : lundi→vendredi, 9h–19h (heure locale). Week-ends et hors 9-19 exclus.
+function bizHours(startMs,endMs){
+  if(!(endMs>startMs)) return 0;
+  if(endMs-startMs > 45*86400000) return 999; // au-delà de ~45 j : de toute façon très en retard
+  const H0=9,H1=19; let total=0;
+  const day=new Date(startMs); day.setHours(0,0,0,0);
+  while(day.getTime()<endMs){
+    const dow=day.getDay(); // 0=dim, 6=sam
+    if(dow!==0 && dow!==6){
+      const ws=new Date(day); ws.setHours(H0,0,0,0);
+      const we=new Date(day); we.setHours(H1,0,0,0);
+      const s=Math.max(startMs, ws.getTime()), e=Math.min(endMs, we.getTime());
+      if(e>s) total+=(e-s);
+    }
+    day.setDate(day.getDate()+1);
+  }
+  return total/3600000;
+}
+
+// Rendu des bulles. Les bulles de comptage sont cliquables (items = liste de projets) ;
+// Taux d'annulation et Délai de réponse ne le sont pas.
+let RI_SPECS=[];
+function renderRi(specs){
+  RI_SPECS=specs;
+  $('#riGrid').innerHTML=specs.map((s,i)=>{
+    const clk=s.items!=null;
+    return `<div class="bubble${clk?' clickable':''}" data-idx="${i}" style="--accent:${s.accent}"><div class="blab">${s.label}</div>`
+      +`<div class="bval"${s.color?` style="color:${s.color}"`:''}>${s.value}</div>`
+      +(s.foot?`<div class="bfoot">${s.foot}</div>`:'')
+      +(clk?'<div class="bmore">détail ›</div>':'')+`</div>`;
+  }).join('');
+  $('#riGrid').querySelectorAll('.bubble.clickable').forEach(el=>{ el.onclick=()=>openDetail(+el.dataset.idx); });
+}
+function openDetail(i){
+  const s=RI_SPECS[i]; if(!s||!s.items) return;
+  const items=s.items.slice().sort((a,b)=>String(a.title||'').localeCompare(String(b.title||''),'fr'));
+  $('#riMTitle').textContent='Détail · '+s.label;
+  $('#riMSub').textContent=nf.format(items.length)+' projet'+(items.length>1?'s':'');
+  $('#riMBody').innerHTML=items.length ? '<table>'+items.map(x=>`<tr><td>${esc(x.title||('#'+x.id))}</td></tr>`).join('')+'</table>' : '<div class="empty">Aucun projet</div>';
+  $('#riModal').classList.add('on');
+}
+$('#riClose').onclick=()=>$('#riModal').classList.remove('on');
+$('#riModal').addEventListener('click',(e)=>{ if(e.target.id==='riModal')$('#riModal').classList.remove('on'); });
+
+function compute(){
+  const d=state.raw; if(!d) return;
+  const nowMs=Date.parse(d.generatedAt)||Date.now();
+  // Phases réelles, triées par ordre du board. On identifie les étapes clés par leur nom.
+  const phases=(d.phases||[]).slice().sort((a,b)=>((a.order_nr!=null?a.order_nr:0)-(b.order_nr!=null?b.order_nr:0)));
+  const orderIdx=new Map(); phases.forEach((p,i)=>orderIdx.set(Number(p.id), p.order_nr!=null?Number(p.order_nr):i));
+  const idxOf=(pid)=>{const v=orderIdx.get(Number(pid));return v!=null?v:null;};
+  const findP=(t)=>phases.find(p=>t(norm(p.name)));
+  const validP= findP(n=>/validation/.test(n));                              // "Validation garage" (ordre 2)
+  const arP  = findP(n=>/relancer/.test(n)&&!/tuv/.test(n));                 // "A relancer - attente infos" (ordre 4)
+  const bdcP = findP(n=>/bdc\s*a\s*signer/.test(n)) || findP(n=>/bdc/.test(n)&&/signer/.test(n)); // "BDC à signer"
+  const paieP= findP(n=>/paiement\s*total/.test(n));                          // "Paiement total - CT OK"
+  const cpiP = findP(n=>/doc\s*cpi/.test(n)) || findP(n=>/cpi/.test(n)&&/attente/.test(n));       // "Attente doc CPI" (ordre 16)
+  const arIdx=arP?idxOf(arP.id):null, validIdx=validP?idxOf(validP.id):null, cpiIdx=cpiP?idxOf(cpiP.id):null;
+
+  const collabs=(d.collaborators||[]);
+  const ftok=(s)=>norm(s).split(/[\s\-']/)[0];        // prénom (gère « Géraldine Dupont » -> geraldine)
+  const canon=new Map(collabs.map(c=>[ftok(c),c]));
+  const riField=d.riField||'relation_garage';
+  const cf=(p,k)=>p.custom_fields?p.custom_fields[k]:undefined;
+  const riOf=(p)=>canon.get(ftok(cf(p,riField)));
+  const tms=(p)=>{ const r=parseD(p.resp_time)||parseD(p.update_time); return r?r.getTime():null; }; // dernière "réponse"
+
+  // Les projets terminés (completed) et supprimés ne comptent jamais dans les stats.
+  const scMs=(p)=>{ const r=parseD(p.status_change_time); return r?r.getTime():null; };
+  const adMs=(p)=>{ const r=parseD(p.add_time); return r?r.getTime():null; };   // date de création
+  const all=(d.projects||[]).filter(p=> p.status!=='deleted' && p.status!=='completed' && riOf(p)).map(p=>{
+    return {ri:riOf(p),status:p.status,pid:Number(p.phase_id),idx:idxOf(p.phase_id),updMs:tms(p),scMs:scMs(p),addMs:adMs(p),title:p.title,id:p.id};
+  });
+  const list = state.ri==='all' ? all : all.filter(p=>p.ri===state.ri);
+
+  const atOpen=(id)=>list.filter(p=>id!=null && p.pid===id && p.status==='open'); // ouverts, à l'étape courante
+  // Projets en cours = ouverts dans la plage « Validation garage » → « Attente doc CPI » (zone active du RI).
+  const enCours=list.filter(p=> p.status==='open' && validIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=validIdx && p.idx<=cpiIdx);
+  const attente=atOpen(arP?Number(arP.id):null);
+  const bdc=atOpen(bdcP?Number(bdcP.id):null);
+  const paiement=atOpen(paieP?Number(paieP.id):null);
+  const docs=atOpen(cpiP?Number(cpiP.id):null);
+  // Taux d'annulation :
+  //   Numérateur   = annulés PENDANT LE MOIS EN COURS, dans « À relancer » → « Attente doc CPI ».
+  //   Dénominateur = projets OUVERTS à partir de « À relancer » jusqu'à la fin (phase ≥ À relancer).
+  //   Remise à zéro le 1er du mois.
+  const mkey=(ms)=>{ if(ms==null) return null; const d=new Date(ms); return d.getFullYear()+'-'+d.getMonth(); };
+  const curM=mkey(nowMs);
+  const inRange=(p)=> arIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=arIdx && p.idx<=cpiIdx;
+  const annulMois=list.filter(p=> p.status==='canceled' && inRange(p) && mkey(p.scMs)===curM).length;
+  const ouvertsAR=list.filter(p=> p.status==='open' && arIdx!=null && p.idx!=null && p.idx>=arIdx).length;
+  // Dénominateur = ouverts (≥ À relancer) + annulés du mois, pour que le taux reste borné à 100 %.
+  const baseAnnul=ouvertsAR+annulMois;
+  const taux= baseAnnul>0 ? annulMois/baseAnnul*100 : null;
+  // Délai de réponse (heures ouvrées) : projets ouverts de « Validation garage » à « Attente doc CPI ».
+  const inDelai=(p)=> p.status==='open' && validIdx!=null && cpiIdx!=null && p.idx!=null && p.idx>=validIdx && p.idx<=cpiIdx;
+  const dels=list.filter(inDelai).map(p=>p.updMs?bizHours(p.updMs,nowMs):null).filter(v=>v!=null&&v>=0);
+  const delai=dels.length? dels.reduce((a,b)=>a+b,0)/dels.length : null;
+  // Taux de transformation (même entonnoir que « Projets en cours ») :
+  //   parmi les projets EN COURS (ouverts, Validation garage → Attente doc CPI), la part arrivée à CPI.
+  //   Numérateur = sous-ensemble des « en cours » situés à « Attente doc CPI » (fin de la plage).
+  const atteintCPI = enCours.filter(p=> cpiIdx!=null && p.idx!=null && p.idx>=cpiIdx);
+  const transfo = enCours.length>0 ? atteintCPI.length/enCours.length*100 : null;
+  const tauxCol = taux==null?'var(--muted)':taux>=30?'#D9534F':taux>=15?'#EE9A34':'#1F9D57';
+  const delaiCol = delai==null?'var(--muted)':delai>24?'#D9534F':'#1F9D57';
+  // Dossiers prioritaires : projets EN COURS (Validation garage → Attente doc CPI) sans aucun signal
+  //   du RI (note, champ modifié, changement de phase) depuis plus de 48 h ouvrées (lun–ven 9h–19h).
+  //   updMs = resp_time = max(update_time, status_change_time, dernière note du RI) — calculé côté serveur.
+  const PRIO_H=48;
+  const prioritaires=enCours.filter(p=> p.updMs==null || bizHours(p.updMs,nowMs)>PRIO_H);
+  const prioCol = prioritaires.length>0 ? '#D9534F' : '#1F9D57';
+
+  renderRi([
+    {label:'Dossiers prioritaires', value:nf.format(prioritaires.length), accent:prioCol, color:prioCol, items:prioritaires, foot:'pas de réponse depuis plus de 48h'},
+    {label:'Projets en cours', value:nf.format(enCours.length), accent:'var(--brand)', items:enCours, foot:'de Validation garage à Attente doc CPI'},
+    {label:'En attente de traitement', value:nf.format(attente.length), accent:'var(--s-r2)', items:attente},
+    {label:'BDC obtenus', value:nf.format(bdc.length), accent:'var(--s-ce)', items:bdc},
+    {label:'Paiement total', value:nf.format(paiement.length), accent:'var(--s-mandat)', items:paiement},
+    {label:'Attente doc CPI', value:nf.format(docs.length), accent:'#EE9A34', items:docs},
+    {label:"Taux d'annulation", value: taux==null?'—':nf1.format(taux)+' %', accent:tauxCol, color:tauxCol, items:null, foot:'🔄 remis à zéro le 1er du mois'},
+    {label:'Taux de transformation', value: transfo==null?'—':nf1.format(transfo)+' %', accent:'var(--s-ce)', items:atteintCPI, foot:'en cours arrivés à CPI'},
+    {label:'Délai de réponse', value: delai==null?'—':nf.format(Math.round(delai))+' h', accent:delaiCol, color:delaiCol, items:null},
+  ]);
+}
+
+function fillRi(d){
+  const sel=$('#riSel');
+  if(sel.dataset.filled!=='1'&&d.collaborators){ d.collaborators.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);}); sel.dataset.filled='1'; }
+}
+$('#riSel').onchange=(e)=>{state.ri=e.target.value;compute();};
+
+// Cache local : affichage instantané du dernier instantané, puis rafraîchissement en arrière-plan.
+const RI_CK='ri_data', RI_TS='ri_data_ts';
+function readCache(){ try{const r=localStorage.getItem(RI_CK),ts=+localStorage.getItem(RI_TS)||0; if(r && Date.now()-ts<7*864e5) return JSON.parse(r);}catch(_){} return null; }
+function writeCache(d){ try{localStorage.setItem(RI_CK,JSON.stringify(d));localStorage.setItem(RI_TS,String(Date.now()));}catch(_){} }
+function clearCache(){ try{localStorage.removeItem(RI_CK);localStorage.removeItem(RI_TS);}catch(_){} }
+
+function applyData(d){
+  state.raw=d; fillRi(d);
+  const when=new Date(d.generatedAt).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
+  if(d.empty){
+    $('#subline').textContent='Aucun projet récupéré';
+    $('#riNote').innerHTML="⚠ Aucun projet récupéré (raison : <b>"+esc(d.reason||'?')+"</b>). Ouvre <code>/api/ri?debug=1</code> et envoie le résultat pour diagnostic.";
+  } else {
+    $('#subline').textContent='Vos projets Pipedrive · maj '+when;
+    $('#riNote').innerHTML="";
+  }
+  compute();
+  $('#statusBox').style.display='none';$('#content').style.display='block';
+}
+async function fetchRi(force){
+  const r=await fetch('/api/ri'+(force?('?fresh='+Date.now()):''),{cache:'no-store'});
+  if(r.status===401){ location.href='/'; return null; }
+  const d=await r.json();
+  if(d.error) throw new Error(d.message||'Erreur');
+  return d;
+}
+async function refreshBg(){
+  $('#refreshBtn').classList.add('spin');
+  try{ const d=await fetchRi(false); if(d){ writeCache(d); applyData(d); } }catch(_){}
+  finally{ $('#refreshBtn').classList.remove('spin'); }
+}
+async function load(force){
+  if(!force){ const c=readCache(); if(c){ applyData(c); refreshBg(); return; } }
+  $('#content').style.display='none';
+  $('#statusBox').style.display='';$('#statusBox').innerHTML='<span class="spin"></span>Chargement du Service RI… (le premier chargement peut prendre quelques secondes)';
+  try{ const d=await fetchRi(force); if(d){ writeCache(d); applyData(d); } }
+  catch(e){ $('#statusBox').innerHTML='⚠ '+esc(e.message); }
+}
+$('#refreshBtn').onclick=()=>load(true);
+fetch('/api/session',{cache:'no-store'}).then(r=>r.json()).then(s=>{ if(s.required) $('#logoutBtn').style.display=''; }).catch(()=>{});
+load();
+</script>
+</body>
+</html>

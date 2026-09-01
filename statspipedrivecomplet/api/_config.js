@@ -1,0 +1,61 @@
+// Mapping entre TES concepts métier et la structure technique de ton Pipedrive.
+// Rempli via des variables d'environnement (idéal pour Vercel) ou, à défaut,
+// via un fichier config.json à la racine. Les clés/IDs se récupèrent avec
+// `node scripts/discover.js` (voir README).
+
+const fs = require('fs');
+const path = require('path');
+
+function fromFile() {
+  try {
+    const p = path.join(__dirname, '..', 'config.json');
+    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (_) {}
+  return {};
+}
+
+function list(v) {
+  if (!v) return [];
+  return String(v).split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function getMapping() {
+  const f = fromFile();
+  const e = process.env;
+  return {
+    // Valeur d'un mandat en euros.
+    mandatValue: Number(e.PIPEDRIVE_MANDAT_VALUE || f.mandatValue || 500),
+
+    // Pipelines à inclure (IDs). Vide = tous.
+    pipelines: list(e.PIPEDRIVE_PIPELINES).map(Number).filter(Boolean).length
+      ? list(e.PIPEDRIVE_PIPELINES).map(Number)
+      : (Array.isArray(f.pipelines) ? f.pipelines.map(Number) : []),
+
+    // Affaires — champ personnalisé "date de règlement mandat" (clé API hashée).
+    mandatDateField: e.PIPEDRIVE_MANDAT_DATE_FIELD || f.mandatDateField || '',
+
+    // Où vit le champ "résultat d'appel" : 'activity' (défaut), 'deal' ou 'person'.
+    ceSource: (e.PIPEDRIVE_CE_SOURCE || f.ceSource || 'activity'),
+    // Champ "résultat de l'appel" (clé API hashée) + valeur "Contact établi".
+    ceField: e.PIPEDRIVE_CE_FIELD || f.ceField || '',
+    // (Optionnel mais recommandé) Champ DATE rempli par une automatisation Pipedrive
+    // le jour où "résultat d'appel" passe à "Contact établi". Sert à dater le CE
+    // exactement (sinon repli sur la date de création de la fiche).
+    ceDateField: e.PIPEDRIVE_CE_DATE_FIELD || f.ceDateField || '',
+    // Peut être un ID d'option (nombre) ou le libellé exact. Plusieurs valeurs possibles.
+    ceValues: (list(e.PIPEDRIVE_CE_VALUES).length ? list(e.PIPEDRIVE_CE_VALUES)
+      : (Array.isArray(f.ceValues) ? f.ceValues : (f.ceValue ? [f.ceValue] : []))),
+    // Restreindre aux activités de ces types (ex: "call"). Vide = tous types.
+    ceActivityTypes: list(e.PIPEDRIVE_CE_ACTIVITY_TYPES).length
+      ? list(e.PIPEDRIVE_CE_ACTIVITY_TYPES)
+      : (Array.isArray(f.ceActivityTypes) ? f.ceActivityTypes : []),
+  };
+}
+
+// Le mapping est-il suffisamment rempli pour interroger les vraies données ?
+// Le champ "règlement mandat" suffit à basculer en réel (le CE peut être ajouté ensuite).
+function isMapped(m) {
+  return Boolean(m.mandatDateField);
+}
+
+module.exports = { getMapping, isMapped };

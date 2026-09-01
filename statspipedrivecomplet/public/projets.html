@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Projets · VPA</title>
+<style>
+  :root{
+    --brand:#859CB6; --brand-2:#6C87A4; --brand-ink:#2A3B4E; --brand-soft:#EAEFF5;
+    --page:#EEF2F7; --surface:#FFFFFF; --surface-2:#F3F6FA;
+    --text-primary:#1B2733; --text-secondary:#5C6B7A; --muted:#94A2B0;
+    --grid:#E5EBF1; --baseline:#CBD5E0; --border:rgba(42,59,78,.10);
+    --good:#1F9D57; --warn:#C77B18; --critical:#D9534F;
+  }
+  [data-theme="dark"]{
+    --brand:#94ABC6; --brand-2:#7C97B5; --brand-ink:#0F1A26; --brand-soft:#1B2836;
+    --page:#0E141B; --surface:#172230; --surface-2:#1E2C3B;
+    --text-primary:#EAF1F8; --text-secondary:#A7B6C4; --muted:#6E7F90;
+    --grid:#223141; --baseline:#324556; --border:rgba(255,255,255,.09);
+    --good:#2CB86A; --warn:#E0A23A; --critical:#E8706B;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--page);color:var(--text-primary)}
+  .appbar{position:sticky;top:0;z-index:25;background:linear-gradient(120deg,var(--brand-ink),var(--brand-2));box-shadow:0 2px 14px rgba(0,0,0,.14)}
+  .appbar-inner{max-width:1180px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:14px}
+  .logo-img{height:40px;width:auto;flex:none;display:block}
+  .brand-title{color:#fff;font-weight:800;font-size:17px;line-height:1.1}
+  .sub{color:rgba(255,255,255,.72);font-size:12px}
+  .appbar-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .navlink{color:#fff;text-decoration:none;font-size:13.5px;font-weight:700;padding:8px 12px;border-radius:9px;background:rgba(255,255,255,.12)}
+  .navlink.ghost{background:transparent;border:1px solid rgba(255,255,255,.28)}
+  .icon-btn{background:rgba(255,255,255,.12);border:none;color:#fff;width:36px;height:36px;border-radius:9px;cursor:pointer;font-size:15px}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 18px 60px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  select{appearance:none;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:11px 34px 11px 13px;font-size:14px;color:var(--text-primary);cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%237C8A99' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");background-repeat:no-repeat;background-position:right 12px center}
+  h2{font-size:15px;margin:22px 0 10px;color:var(--text-primary)}
+  h2 .hint{font-size:12px;color:var(--muted);font-weight:500}
+  .grid{display:grid;gap:14px}
+  .g4{grid-template-columns:repeat(4,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g2{grid-template-columns:1.2fr .8fr}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 1px 2px rgba(16,31,45,.05)}
+  .tile{position:relative;overflow:hidden}
+  .tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent,var(--brand))}
+  .tile .label{font-size:12.5px;color:var(--text-secondary);font-weight:650}
+  .tile .value{font-size:30px;font-weight:850;margin-top:8px;font-variant-numeric:tabular-nums}
+  .tile .foot{font-size:12px;color:var(--muted);margin-top:4px}
+  .hint{font-size:12.5px;color:var(--muted);margin:2px 0 10px}
+  .status{padding:40px;text-align:center;color:var(--text-secondary)}
+  .spin{width:26px;height:26px;border:3px solid var(--grid);border-top-color:var(--brand);border-radius:50%;display:inline-block;animation:sp .8s linear infinite;vertical-align:middle;margin-right:8px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--grid)}
+  th{color:var(--text-secondary);font-weight:650;font-size:12px}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700}
+  .demo-badge{display:none;background:#FFE9A8;color:#7A5B00;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800}
+  .donut-wrap{display:flex;align-items:center;gap:18px}
+  .donut-legend{font-size:13px;color:var(--text-secondary);line-height:1.7}
+  @media(max-width:900px){.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:1fr}.g2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="appbar">
+  <div class="appbar-inner">
+    <img class="logo-img" src="logo.png" alt="VPA" />
+    <div>
+      <div class="brand-title">Projets</div>
+      <div class="sub" id="subline">Chargement…</div>
+    </div>
+    <div class="appbar-actions">
+      <span class="demo-badge" id="demoBadge">Démo</span>
+      <a class="navlink ghost" href="/">← Ventes</a>
+      <a class="navlink ghost" href="/service-ri.html">Service RI</a>
+      <button class="icon-btn" id="refreshBtn" title="Actualiser">↻</button>
+      <button class="icon-btn" id="themeBtn" title="Thème clair / sombre">◐</button>
+      <button class="icon-btn" id="logoutBtn" title="Se déconnecter" style="display:none">⎋</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <select id="ownerSel" title="Responsable"><option value="all">Tous les responsables</option></select>
+    <select id="boardSel" title="Tableau"><option value="all">Tous les tableaux</option></select>
+  </div>
+
+  <div id="content" style="display:none">
+    <h2>Volume &amp; statut <span class="hint">état actuel des projets</span></h2>
+    <div class="grid g4">
+      <div class="card tile" id="tOuverts"></div>
+      <div class="card tile" id="tTermines"></div>
+      <div class="card tile" id="tAnnules"></div>
+      <div class="card tile" id="tTotal"></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2 style="margin-top:0">Projets démarrés &amp; terminés <span class="hint">par mois (12 mois)</span></h2>
+      <div id="volChart"></div>
+    </div>
+
+    <h2>Durée &amp; retards</h2>
+    <div class="grid g3">
+      <div class="card tile" id="tDuree"></div>
+      <div class="card tile" id="tRetard"></div>
+      <div class="card tile" id="tSante"></div>
+    </div>
+    <div class="card" id="retardCard" style="margin-top:14px">
+      <h2 style="margin-top:0">Projets en retard <span class="hint">ouverts dont l'échéance est dépassée</span></h2>
+      <div id="retardList"></div>
+    </div>
+
+    <h2>Tâches &amp; complétion</h2>
+    <div class="grid g3">
+      <div class="card" id="taskDonutCard">
+        <div class="donut-wrap">
+          <div id="taskDonut"></div>
+          <div class="donut-legend" id="taskLegend"></div>
+        </div>
+      </div>
+      <div class="card tile" id="tTachesRetard"></div>
+      <div class="card tile" id="tTachesOuvertes"></div>
+    </div>
+  </div>
+
+  <div class="status" id="statusBox"><span class="spin"></span>Chargement des projets…</div>
+</div>
+
+<script>
+const $=(s)=>document.querySelector(s);
+const nf=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
+const nf1=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1});
+const esc=(s)=>String(s==null?'':s).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const state={owner:'all',board:'all',raw:null};
+
+(function(){const t=localStorage.getItem('pd_theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
+$('#themeBtn').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');const dark=c==='dark'||(c!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);const nx=dark?'light':'dark';document.documentElement.setAttribute('data-theme',nx);try{localStorage.setItem('pd_theme',nx);}catch(_){}if(state.raw)render();};
+$('#logoutBtn').onclick=async()=>{try{await fetch('/api/logout',{method:'POST'});}catch(_){}location.href='/';};
+
+function parseD(s){ if(!s)return null; const d=new Date(String(s).length===10?s+'T00:00:00Z':s); return isNaN(d)?null:d; }
+function monthKey(d){ return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0'); }
+function months12(nowMs){ const out=[]; const d=new Date(nowMs); d.setUTCDate(1); for(let i=11;i>=0;i--) out.push(monthKey(new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()-i,1)))); return out; }
+function fmtMonth(k){ const[y,m]=k.split('-'); return new Date(Date.UTC(+y,+m-1,1)).toLocaleDateString('fr-FR',{month:'short'}); }
+
+function tile(el,label,value,foot,accent){ el.style.setProperty('--accent',accent||'var(--brand)'); el.innerHTML=`<div class="label">${label}</div><div class="value"${accent?` style="color:${accent}"`:''}>${value}</div><div class="foot">${foot||''}</div>`; }
+
+// ---- graphique barres groupées (démarrés / terminés) ----
+function barChart(el,labels,a,b,colA,colB){
+  const W=760,H=250,padL=34,padR=12,padT=14,padB=26,iw=W-padL-padR,ih=H-padT-padB;
+  const max=Math.max(1,...a,...b),n=labels.length,gw=iw/n,bw=Math.min(15,gw*0.32),gap=3;
+  const y=(v)=>padT+ih-(v/max)*ih;
+  let grid='';for(let i=0;i<=4;i++){const val=Math.round(max/4*i),yy=y(val);grid+=`<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="var(--grid)"/><text x="${padL-6}" y="${yy+3}" text-anchor="end" font-size="10" fill="var(--muted)">${val}</text>`;}
+  let bars='';labels.forEach((k,i)=>{const cx=padL+gw*i+gw/2;const ha=(a[i]/max)*ih,hb=(b[i]/max)*ih;
+    bars+=`<rect x="${cx-bw-gap/2}" y="${y(a[i])}" width="${bw}" height="${Math.max(0,ha)}" rx="3" fill="${colA}"/><rect x="${cx+gap/2}" y="${y(b[i])}" width="${bw}" height="${Math.max(0,hb)}" rx="3" fill="${colB}"/><text x="${cx}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--muted)">${fmtMonth(k)}</text>`;});
+  el.innerHTML=`<div style="display:flex;gap:16px;font-size:12px;color:var(--text-secondary);margin-bottom:6px"><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${colA};margin-right:5px"></i>Démarrés</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${colB};margin-right:5px"></i>Terminés</span></div><svg viewBox="0 0 ${W} ${H}" width="100%">${grid}${bars}</svg>`;
+}
+// ---- donut complétion tâches ----
+function donut(el,pct,color){
+  const C=2*Math.PI*30,dash=(Math.max(0,Math.min(1,pct/100))*C).toFixed(1);
+  el.innerHTML=`<svg viewBox="0 0 84 84" width="96" height="96"><circle cx="42" cy="42" r="30" fill="none" stroke="var(--grid)" stroke-width="9"/><circle cx="42" cy="42" r="30" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${dash} ${C.toFixed(1)}" transform="rotate(-90 42 42)"/><text x="42" y="47" text-anchor="middle" font-size="19" font-weight="800" fill="${color}">${nf.format(pct)}%</text></svg>`;
+}
+
+function render(){
+  const d=state.raw; if(!d) return;
+  const nowMs=Date.parse(d.generatedAt)||Date.now();
+  const today=new Date(nowMs);
+  const owner=state.owner==='all'?null:Number(state.owner);
+  const board=state.board==='all'?null:Number(state.board);
+  const projs=(d.projects||[]).filter(p=>p.status!=='deleted' && (!owner||Number(p.owner_id)===owner) && (!board||Number(p.board_id)===board));
+  const projIds=new Set(projs.map(p=>p.id));
+  const tasks=(d.tasks||[]).filter(t=>projIds.has(Number(t.project_id)) && (!owner||Number(t.assignee_id)===owner));
+
+  const open=projs.filter(p=>p.status==='open');
+  const done=projs.filter(p=>p.status==='completed');
+  const canceled=projs.filter(p=>p.status==='canceled');
+
+  // Volume & statut
+  tile($('#tOuverts'),'Projets ouverts',nf.format(open.length),'en cours actuellement','var(--brand)');
+  tile($('#tTermines'),'Projets terminés',nf.format(done.length),'statut « completed »','var(--good)');
+  tile($('#tAnnules'),'Projets annulés',nf.format(canceled.length),'statut « canceled »','var(--critical)');
+  tile($('#tTotal'),'Total projets',nf.format(projs.length),'hors supprimés','var(--brand-2)');
+
+  const ms=months12(nowMs);
+  const startedBy=new Map(ms.map(m=>[m,0])), doneBy=new Map(ms.map(m=>[m,0]));
+  projs.forEach(p=>{const s=parseD(p.start_date);if(s&&startedBy.has(monthKey(s)))startedBy.set(monthKey(s),startedBy.get(monthKey(s))+1);
+    if(p.status==='completed'){const e=parseD(p.end_date);if(e&&doneBy.has(monthKey(e)))doneBy.set(monthKey(e),doneBy.get(monthKey(e))+1);}});
+  const cs=getComputedStyle(document.body);
+  barChart($('#volChart'),ms,ms.map(m=>startedBy.get(m)),ms.map(m=>doneBy.get(m)),cs.getPropertyValue('--brand').trim(),cs.getPropertyValue('--good').trim());
+
+  // Durée & retards
+  const durs=done.map(p=>{const s=parseD(p.start_date),e=parseD(p.end_date);return s&&e?(e-s)/86400000:null;}).filter(v=>v!=null&&v>=0);
+  const avgDur=durs.length?Math.round(durs.reduce((a,b)=>a+b,0)/durs.length):null;
+  tile($('#tDuree'),'Durée moyenne',avgDur==null?'—':nf.format(avgDur)+' j','projets terminés (prévue)','var(--brand)');
+  const retard=open.filter(p=>{const e=parseD(p.end_date);return e&&e<today;});
+  tile($('#tRetard'),'Projets en retard',nf.format(retard.length),'échéance dépassée, encore ouverts',retard.length?'var(--critical)':'var(--good)');
+  const atRisk=projs.filter(p=>p.status==='open'&&(p.health_status==='at_risk'||p.health_status==='off_track')).length;
+  tile($('#tSante'),'Projets à risque',nf.format(atRisk),'santé « at risk / off track »',atRisk?'var(--warn)':'var(--good)');
+
+  const nameOf=new Map((d.users||[]).map(u=>[Number(u.id),u.name]));
+  const phaseOf=new Map((d.phases||[]).map(p=>[Number(p.id),p.name]));
+  const rl=retard.slice().sort((a,b)=>parseD(a.end_date)-parseD(b.end_date));
+  $('#retardList').innerHTML = rl.length ? `<table><tr><th>Projet</th><th>Responsable</th><th>Phase</th><th>Échéance</th><th style="text-align:right">Retard</th></tr>`+
+    rl.map(p=>{const e=parseD(p.end_date);const days=Math.floor((today-e)/86400000);return `<tr><td>${esc(p.title)}</td><td>${esc(nameOf.get(Number(p.owner_id))||'—')}</td><td>${esc(phaseOf.get(Number(p.phase_id))||'—')}</td><td>${e.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'2-digit'})}</td><td style="text-align:right"><span class="pill" style="background:rgba(217,83,79,.14);color:var(--critical)">+${days} j</span></td></tr>`;}).join('')+`</table>`
+    : '<div class="hint">Aucun projet en retard 🎉</div>';
+
+  // Tâches & complétion
+  const tDone=tasks.filter(t=>t.done).length, tTotal=tasks.length;
+  const pctDone=tTotal?Math.round(tDone/tTotal*100):0;
+  const pctColor=pctDone>=80?cs.getPropertyValue('--good').trim():pctDone>=50?cs.getPropertyValue('--brand-2').trim():'#EE9A34';
+  donut($('#taskDonut'),pctDone,pctColor);
+  $('#taskLegend').innerHTML=`<b style="color:var(--text-primary);font-size:15px">Complétion des tâches</b><br>${nf.format(tDone)} terminées / ${nf.format(tTotal)} au total<br><span style="color:var(--muted)">sur les projets affichés</span>`;
+  const tRetard=tasks.filter(t=>!t.done&&(()=>{const dd=parseD(t.due_date);return dd&&dd<today;})()).length;
+  tile($('#tTachesRetard'),'Tâches en retard',nf.format(tRetard),'non terminées, échéance dépassée',tRetard?'var(--critical)':'var(--good)');
+  tile($('#tTachesOuvertes'),'Tâches ouvertes',nf.format(tTotal-tDone),'restant à faire','var(--brand)');
+}
+
+function fillFilters(d){
+  const os=$('#ownerSel');
+  if(os.dataset.filled!=='1'&&d.users&&d.users.length){ d.users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.name;os.appendChild(o);}); os.dataset.filled='1'; }
+  const bs=$('#boardSel');
+  if(bs.dataset.filled!=='1'&&d.boards&&d.boards.length){ d.boards.forEach(b=>{const o=document.createElement('option');o.value=b.id;o.textContent=b.name;bs.appendChild(o);}); bs.dataset.filled='1'; }
+}
+$('#ownerSel').onchange=(e)=>{state.owner=e.target.value;render();};
+$('#boardSel').onchange=(e)=>{state.board=e.target.value;render();};
+
+async function load(force){
+  $('#refreshBtn').classList.add('spin');
+  try{
+    const r=await fetch('/api/projects'+(force?('?fresh='+Date.now()):''),{cache:'no-store'});
+    if(r.status===401){ location.href='/'; return; }
+    const d=await r.json();
+    if(d.error) throw new Error(d.message||'Erreur');
+    state.raw=d; fillFilters(d);
+    $('#demoBadge').style.display=d.demo?'inline-block':'none';
+    const when=new Date(d.generatedAt).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
+    $('#subline').textContent=(d.demo?'Aperçu (données simulées)':'Vos projets Pipedrive')+' · maj '+when;
+    render();
+    $('#statusBox').style.display='none';$('#content').style.display='block';
+  }catch(e){ $('#statusBox').innerHTML='⚠ '+esc(e.message); }
+  finally{ $('#refreshBtn').classList.remove('spin'); }
+}
+$('#refreshBtn').onclick=()=>load(true);
+
+// affiche le bouton déconnexion si un mot de passe est actif
+fetch('/api/session',{cache:'no-store'}).then(r=>r.json()).then(s=>{ if(s.required) $('#logoutBtn').style.display=''; }).catch(()=>{});
+load();
+</script>
+</body>
+</html>
