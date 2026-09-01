@@ -489,7 +489,7 @@ const nf = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0});
 const nf1 = new Intl.NumberFormat('fr-FR',{maximumFractionDigits:1});
 
 // ----- Commerciaux : exclusion des non-commerciaux + couleur du prénom selon le genre -----
-const NON_COMMERCIAUX = new Set(['aurore','brigitte','gaelle','gedeon','geraldine','john','lea','mathilde','nesher','pierre','thomas']);
+const NON_COMMERCIAUX = new Set(['aurore','brigitte','gaelle','gedeon','geraldine','john','lea','mathilde','nesher','pierre','thomas','loic','yassir']);
 const PRENOMS_F = new Set(['aurore','brigitte','gaelle','geraldine','lea','mathilde','sophie','camille','chanel','marie','julie','laura','laure','emma','chloe','manon','sarah','celine','nathalie','sandrine','aurelie','amelie','pauline','oceane','marine','elodie','jessica','melanie','virginie','caroline','audrey','charlotte','clara','ines','lucie','alice','eva','jade','lisa','anais','justine','morgane','coralie','estelle','fanny','maeva','noemie','sabrina','sonia','valentine','victoria','yasmine','lila','lina','nina','romane','agathe','apolline','capucine','faustine','garance','margaux','margot','elise','elsa','emilie','flavie','helene','ophelie','solene','tiffany','angelique','severine','delphine','stephanie','carole','isabelle','veronique','patricia','sylvie','katia','sonya','myriam','samira','nadia','fatima','wafa','ines']);
 const PRENOMS_M = new Set(['kesia','gedeon','john','pierre','thomas','nesher','yanis','mathieu','mathis','quentin','kevin','florian','benjamin','guillaume','sebastien','david','jonathan','mickael','cedric','damien','fabien','jerome','ludovic','olivier','vincent','william','yann','dylan','bilal','mehdi','mohamed','karim','sofiane','rayan','hugo','lucas','nathan','leo','louis','gabriel','arthur','jules','adam','raphael','ethan','noah','tom','theo','enzo','clement','maxime','alexandre','antoine','nicolas','julien','romain','baptiste','maxence','valentin','corentin','alexis','anthony','aurelien','bastien','gaetan','gregory','jordan','loic','marc','martin','morgan','pascal','patrice','paul','philippe','remy','simon','steven','sylvain','tanguy','tony','xavier','younes','samir','amine','ayoub','ismael','walid','said','abdel','franck','frederic','laurent','stephane','christophe','gilles','herve','bruno','didier','eric','pascal']);
 const normPrenom = (s)=> String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim().split(/[\s\-']/)[0];
@@ -713,15 +713,38 @@ function launchConfetti(colors){
 const CELEB_TOP={
   mandats:['Champion des mandats ! 🥇','Roi de la signature 👑','En feu ce mois-ci ! 🔥','N°1, personne ne suit 🚀'],
   encaisses:['Champion des encaissements ! 💰','La caisse chante 🎺','Machine à cash 💸','N°1, ça rentre ! 🤑'] };
-const CELEB_OTHER=['Bravo, continue ! 👏','Belle perf 💪','Ça avance fort 🚀','Joli travail ✨','Au top 🙌'];
+// Paliers de messages selon le nombre (mandats ou encaissements). Le n°1 garde son message perso (CELEB_TOP).
+const CELEB_TIERS={
+  low:[ // 0 à 5 : c'est le début
+    "C'est le début, et c'est déjà bien ! 🌱",
+    "Les premiers mandats sont là, continue ! 👏",
+    "Ça démarre bien, lâche rien ! 💪",
+    "Le début d'une belle série, on y croit ! ✨",
+    "Chaque mandat compte, bravo pour ceux-là ! 🙌",
+    "Tu es lancé, la suite va être top ! 🚀" ],
+  mid:[ // 5 à 15 : allez, encore un peu et tu deviens une machine
+    "Allez, encore un peu et tu deviens une machine ! ⚙️",
+    "La machine se met en route, continue ! 🔧",
+    "Belle cadence ! Encore quelques-uns et tu exploses tout ! 🔥",
+    "T'y es presque, la machine chauffe ! 📈",
+    "Encore un effort et tu passes au niveau supérieur ! ⬆️",
+    "Ça monte fort, garde le rythme ! 🚀" ],
+  high:[ // + de 15 : t'es une machine
+    "T'es une MACHINE ! 🤖🔥",
+    "Complètement injouable, t'es trop fort ! 💪",
+    "Une vraie machine à mandats ! ⚙️💥",
+    "Monstre ! Rien ne t'arrête ! 🚀",
+    "T'es dans une autre dimension ! 🌟",
+    "Machine de guerre, chapeau ! 🏆" ] };
 const cpick=(a)=>a[Math.floor(Math.random()*a.length)];
+const tierMsg=(count)=> count<=5 ? cpick(CELEB_TIERS.low) : count<=15 ? cpick(CELEB_TIERS.mid) : cpick(CELEB_TIERS.high);
 function closeCelebrate(){ $('#celebrate').classList.remove('on'); cancelAnimationFrame(CELEB.raf); cvs.classList.remove('on'); cxx.clearRect(0,0,cvs.width,cvs.height); clearTimeout(CELEB.timer); }
 function celebrate(name,rank,kind,count){
   const gold=['#D4AF37','#F4D03F','#FFE07A'], silver=['#A8B4C0','#CBD5E0','#E2E8F0'], festive=['#FF5E5B','#2E6BE6','#A970D6','#2CB86A','#EE9A34'];
   launchConfetti((kind==='encaisses'?gold:silver).concat(festive));
   $('#celebrateEmoji').textContent = rank===0 ? (kind==='encaisses'?'🥇':'🏆') : '🎉';
   const nm=$('#celebrateName'); nm.textContent=name; nm.style.color=genderColor(name);
-  $('#celebrateMsg').textContent = rank===0 ? cpick(CELEB_TOP[kind]) : cpick(CELEB_OTHER);
+  $('#celebrateMsg').textContent = rank===0 ? cpick(CELEB_TOP[kind]) : tierMsg(count);
   $('#celebrateCount').textContent = (kind==='encaisses'?'💼 '+nf.format(count)+' encaissé'+(count>1?'s':'') : '📄 '+nf.format(count)+' mandat'+(count>1?'s':''));
   const ov=$('#celebrate'); ov.classList.add('on');
   const card=$('#celebrateCard'); card.style.animation='none'; void card.offsetWidth; card.style.animation='';
