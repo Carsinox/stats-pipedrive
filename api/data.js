@@ -74,11 +74,14 @@ async function buildRealBody(nowMs, mapping) {
     pdGetAll('/pipelines'),
     pdGet('/users', {}, 'v1').then((r) => r.data || []).catch(() => []),
     dealFetch,
-    // Prospects (leads) : on prend TOUS les statuts (en cours, archivés, convertis en affaire).
-    // Par défaut l'API ne renvoie que les leads non archivés -> les CE des prospects archivés
-    // (ex: prospects traités puis archivés) étaient perdus. archived_status:'all' les récupère.
-    // Les convertis restent aussi comptés via leur affaire ; la déduplication par personne évite le double comptage.
-    hasCE ? pdGetAllV1('/leads', { archived_status: 'all' }) : Promise.resolve([]),
+    // Prospects (leads) : actifs + ARCHIVÉS. Depuis le 15/07/2025, l'endpoint /leads IGNORE
+    // le paramètre archived_status et ne renvoie QUE les non-archivés -> les CE des prospects
+    // archivés étaient perdus. On récupère donc les archivés via l'endpoint DÉDIÉ /v1/leads/archived
+    // et on fusionne les deux listes (la déduplication par personne évite tout double comptage).
+    // Les prospects convertis en affaire restent, eux, comptés via leur affaire.
+    hasCE
+      ? Promise.all([pdGetAllV1('/leads'), pdGetAllV1('/leads/archived').catch(() => [])]).then((a) => a.flat())
+      : Promise.resolve([]),
   ]);
 
   const users = (usersRaw || [])
@@ -93,6 +96,7 @@ async function buildRealBody(nowMs, mapping) {
 
   return JSON.stringify({
     demo: false, generatedAt: new Date(nowMs).toISOString(),
+    codeVersion: 'archives-v2', // marqueur : confirme que cette version du code est bien déployée
     mapping: publicMapping(mapping),
     pipelines: pipeList, users,
     deals: deals.map((d) => slimDeal(d, mapping.mandatDateField, mapping.ceField, mapping.ceDateField)),
