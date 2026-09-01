@@ -125,12 +125,11 @@
       const collect = (en) => {
         if (!ownedBy(en)) return;
         if (!matchesCE(getCF(en, mapping.ceField), mapping.ceValues)) return;
-        // Date du CE : champ "Date CE" stampé par l'automatisation (exact), sinon repli
-        // sur la date de création de la fiche. On ne jette JAMAIS un "Contact établi" :
-        // une fiche marquée sans Date CE (historique d'avant l'automatisation, saisie
-        // manuelle, automatisation non déclenchée) est comptée à sa date de création.
+        // Date du CE : champ "Date CE" stampé par l'automatisation (exact), sinon création.
         const stampedTs = mapping.ceDateField ? parseTs(getCF(en, mapping.ceDateField)) : null;
-        const ts = stampedTs || parseTs(en.add_time);
+        // Champ Date CE configuré -> comptage STRICT par cette date (comme Pipedrive) ;
+        // sinon repli sur la création (démo / champ non configuré).
+        const ts = mapping.ceDateField ? stampedTs : parseTs(en.add_time);
         if (!ts) return;
         const pid = personIdOf(en);
         const tt = normTitle(en.title);

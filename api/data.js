@@ -74,7 +74,11 @@ async function buildRealBody(nowMs, mapping) {
     pdGetAll('/pipelines'),
     pdGet('/users', {}, 'v1').then((r) => r.data || []).catch(() => []),
     dealFetch,
-    hasCE ? pdGetAllV1('/leads') : Promise.resolve([]),
+    // Prospects (leads) : on prend TOUS les statuts (en cours, archivés, convertis en affaire).
+    // Par défaut l'API ne renvoie que les leads non archivés -> les CE des prospects archivés
+    // (ex: prospects traités puis archivés) étaient perdus. archived_status:'all' les récupère.
+    // Les convertis restent aussi comptés via leur affaire ; la déduplication par personne évite le double comptage.
+    hasCE ? pdGetAllV1('/leads', { archived_status: 'all' }) : Promise.resolve([]),
   ]);
 
   const users = (usersRaw || [])
